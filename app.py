@@ -9,6 +9,11 @@ from kinde_sdk.kinde_api_client import GrantType, KindeApiClient
 from kinde_sdk.apis.tags import users_api
 from kinde_sdk.model.user import User
 
+import requests
+import os
+
+MIDNIGHT_API_URL = "https://midnight.network/api/store"  # Replace with the actual API URL
+
 app = Flask(__name__)
 app.config.from_object("config")
 Session(app)
@@ -130,8 +135,6 @@ def get_helper_functions():
             data["int_flag"] = kinde_client.get_integer_flag("competitions_limit",10)
             template = "helpers.html"
 
-
-
         else:
             template = "logged_out.html"
 
@@ -179,3 +182,42 @@ def get_api_demo():
                 print(f"Management API not setup: {ex}")
 
     return render_template(template, **data)
+
+def store_swipe_on_midnight(user_id, accelerator_id, swipe_direction):
+    data = {
+        "user_id": user_id,
+        "accelerator_id": accelerator_id,
+        "swipe_direction": swipe_direction
+    }
+
+    headers = {
+        "Authorization": f"Bearer {os.getenv('MIDNIGHT_API_KEY')}",  # Securely retrieved token
+        "Content-Type": "application/json"
+    }
+
+    response = requests.post(MIDNIGHT_API_URL, json=data, headers=headers)
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"Error storing swipe: {response.status_code}, {response.text}")
+    
+@app.route("/swipe", methods=["POST"])
+def swipe():
+    swipe_data = request.json
+    try:
+        result = store_swipe_on_midnight(
+            swipe_data["user_id"],
+            swipe_data["accelerator_id"],
+            swipe_data["swipe_direction"]
+        )
+        return jsonify({"status": "success", "data": result}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
+
+
+if __name__ == '__main__':
+   app.run(debug=True, port=5002)
