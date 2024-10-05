@@ -1,4 +1,5 @@
 from kinde_sdk.kinde_api_client import GrantType
+import os
 
 
 SITE_HOST = "localhost"
@@ -18,3 +19,6 @@ KINDE_CALLBACK_URL = "http://localhost:5000/api/auth/kinde_callback"
 LOGOUT_REDIRECT_URL = "http://localhost:5000"
 CLIENT_ID = "1e6a29e092834b2183e0b531b2de63b5"
 CLIENT_SECRET = "7IFpdQbbyvA5Eyd9BzlsWenbyiXVa1ZkFdizdNQjEmHZcP5cJaSq"
+
+MIDNIGHT_API_KEY = os.getenv("MIDNIGHT_API_KEY")
+MIDNIGHT_API_SECRET = os.getenv("MIDNIGHT_API_SECRET")

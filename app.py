@@ -11,6 +11,11 @@ from kinde_sdk.kinde_api_client import GrantType, KindeApiClient
 from kinde_sdk.apis.tags import users_api
 from kinde_sdk.model.user import User
 
+import requests
+import os
+
+MIDNIGHT_API_URL = "https://midnight.network/api/store"  # Replace with the actual API URL
+
 app = Flask(__name__)
 app.config.from_object("config")
 Session(app)
