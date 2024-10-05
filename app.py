@@ -191,7 +191,7 @@ def company_assessment():
 
     if form.validate_on_submit():
         company_name = form.company_name.data
-        implemented_accelerators = form.implemented_accelerators.data
+        implemented_products = form.implemented_products.data
         industry = form.industry.data
         program_start_date = form.program_start_date.data
         company_size = form.company_size.data
@@ -200,7 +200,7 @@ def company_assessment():
         current_challenges = form.current_challenges.data
 
         print(f"Company Name: {company_name}")
-        print(f"Implemented Accelerators: {implemented_accelerators}")
+        print(f"Implemented Products: {implemented_products}")
         print(f"Industry: {industry}")
         print(f"Program Start Date: {program_start_date}")
         print(f"Company Size: {company_size}")

@@ -18,9 +18,10 @@
                 {{ form.company_name(size=32) }}
             </div>
 
+            <!-- Corrected to use form.implemented_accelerators() for rendering -->
             <div class="form-group">
-                {{ form.implemented_accelerators.label }}<br>
-                {{ form.implemented_accelerators() }}
+                {{ form.implemented_products.label }}<br>
+                {{ form.implemented_products() }}  <!-- Correct rendering method -->
             </div>
 
             <div class="form-group">
@@ -67,7 +68,22 @@
             {% endif %}
             {% endwith %}
         </form>
+
+        <!-- Display selected implemented products below -->
+        <h3>Selected Implemented Products:</h3>
+        <div id="selected-products">
+            {% if form.implemented_products.data %}
+                <ul>
+                    {% for product in form.implemented_products.data %}
+                        <li>{{ product }}</li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>No products selected.</p>
+            {% endif %}
+        </div>
     </div>
+
     <script>
         function initAutocomplete() {
             var locationInput = document.getElementById('location');
@@ -84,3 +100,4 @@
     </script>
 </body>
 </html>
+

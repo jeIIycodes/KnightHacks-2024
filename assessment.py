@@ -1,9 +1,9 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, TextAreaField, SelectField, DateField, IntegerField, SubmitField
+from wtforms import StringField, TextAreaField, SelectField, DateField, IntegerField, SubmitField, SelectMultipleField
 from wtforms.validators import DataRequired, Optional, NumberRange
 import pandas as pd
 
-def get_accelerator_choices():
+def get_product_choices():
     try:
         df = pd.read_csv('./AiPredictor/data/accelerators.tsv', sep='\t')
         choices = [(row['Product']) for index, row in df.iterrows()]
@@ -11,11 +11,11 @@ def get_accelerator_choices():
     except FileNotFoundError:
         return []
 
-print(get_accelerator_choices())
+print(get_product_choices())
 
 class CompanyForm(FlaskForm):
     company_name = StringField('Company Name', validators=[DataRequired()])
-    implemented_accelerators = SelectField('Implemented Products', choices = get_accelerator_choices(), validators=[Optional()])
+    implemented_products = SelectMultipleField('Implemented Products', choices = get_product_choices(), validators=[Optional()])
 
     industry = SelectField(
         'Industry',
