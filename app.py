@@ -1,8 +1,10 @@
 from datetime import date
-from flask import Flask, url_for, render_template, request, session
+from flask import Flask, url_for, render_template, request, session, redirect, flash
+from win32comext.shell.demos.servers.shell_view import debug
+
 from flask_session import Session
 from functools import wraps
-
+from assessment import CompanyForm
 
 from kinde_sdk import Configuration, ApiException
 from kinde_sdk.kinde_api_client import GrantType, KindeApiClient
@@ -179,3 +181,35 @@ def get_api_demo():
                 print(f"Management API not setup: {ex}")
 
     return render_template(template, **data)
+
+@app.route("/company_assessment", methods=["GET", "POST"])
+def company_assessment():
+    form = CompanyForm()
+
+    if not session.get("user"):
+        return app.redirect(url_for('index'))
+
+    if form.validate_on_submit():
+        company_name = form.company_name.data
+        implemented_accelerators = form.implemented_accelerators.data
+        industry = form.industry.data
+        program_start_date = form.program_start_date.data
+        company_size = form.company_size.data
+        location = form.location.data
+        company_description = form.company_description.data
+        current_challenges = form.current_challenges.data
+
+        print(f"Company Name: {company_name}")
+        print(f"Implemented Accelerators: {implemented_accelerators}")
+        print(f"Industry: {industry}")
+        print(f"Program Start Date: {program_start_date}")
+        print(f"Company Size: {company_size}")
+        print(f"Location: {location}")
+        print(f"Company Description: {company_description}")
+        print(f"Current Challenges: {current_challenges}")
+
+        flash('Company information submitted successfully!', 'success')
+
+        return redirect(url_for("company_assessment"))
+
+    return render_template("company_assessment.html", form=form)
