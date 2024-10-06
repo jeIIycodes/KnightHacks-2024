@@ -83,14 +83,15 @@ class NGramModel:
                     if last_word_accelerator in token:
                         prob+=10
                         # Adjust the probability based on specific conditions
-                        if "TuneUp" in accelerator and remaining_context_tokens[i+1] == 'implemented':
-                            prob += 100
-                        elif "TuneUp" in accelerator and remaining_context_tokens[i+1] != 'implemented':
-                            prob=0
-                            break
-                        elif "TuneUp" not in accelerator and remaining_context_tokens[i+1] == 'implemented':
-                            prob = 0
-                            break
+                        if i+1 < len(remaining_context_tokens):
+                            if "TuneUp" in accelerator and remaining_context_tokens[i+1] == 'implemented':
+                                prob += 100
+                            elif "TuneUp" in accelerator and remaining_context_tokens[i+1] != 'implemented':
+                                prob=0
+                                break
+                            elif "TuneUp" not in accelerator and remaining_context_tokens[i+1] == 'implemented':
+                                prob = 0
+                                break
 
                         # Remove the matched token
                         remaining_context_tokens.pop(i)
