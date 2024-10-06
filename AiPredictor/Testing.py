@@ -7,58 +7,13 @@ import numpy as np
 import warnings
 from sklearn.model_selection import KFold
 import concurrent.futures
-from models import MostCommonModel, NGramModel
+from model_factory import create_most_common_model, create_ngram_model
+from utils.data_loader import load_data
+from models.most_common_model import MostCommonModel
+from models.ngram_model import NGramModel
 
 # Suppress warnings
 warnings.filterwarnings('ignore')
-
-def load_data():
-    """
-    Load and preprocess the datasets. Returns the preprocessed data needed for the models.
-
-    Returns:
-        companies_df: DataFrame of companies.
-        company_products: Mapping from companies to products and implementation status.
-        company_accelerators: Mapping from companies to accelerators.
-    """
-    # Load the data
-    accelerators_df = pd.read_csv('data/accelerators.tsv', sep='\t', header=0)
-    companies_df = pd.read_csv('data/companies.tsv', sep='\t', header=0)
-    entitlements_df = pd.read_csv('data/company_entitlements.tsv', sep='\t', header=0)
-    products_df = pd.read_csv('data/products.tsv', sep='\t', header=0)
-
-    # Merge products with entitlements to get product details including Category
-    entitlements_df = entitlements_df.merge(
-        products_df[['Name', 'Category']],
-        left_on='Product',
-        right_on='Name',
-        how='left',
-        suffixes=('', '_Product')
-    )
-
-    # Merge entitlements with companies to get company name and industry
-    entitlements_df = entitlements_df.merge(
-        companies_df[['Name', 'Industry']],
-        left_on='Company',
-        right_on='Name',
-        how='left',
-        suffixes=('', '_Company')
-    )
-
-    # Create a mapping from Company to their products, implementation status, and categories as separate tokens
-    company_products = entitlements_df.groupby('Company').apply(
-        lambda x: [
-            ['Product_' + row['Product'], 'implemented' if row['Implemented'] else 'not_implemented', 'Category_' + row['Category']]
-            for idx, row in x.iterrows()
-        ]
-    ).to_dict()
-
-    # Create a mapping from Company to their accelerators
-    company_accelerators = entitlements_df.groupby('Company')['Accelerator'].apply(
-        lambda accelerators: ['Accelerator_' + acc for acc in accelerators]
-    ).to_dict()
-
-    return companies_df, company_products, company_accelerators,accelerators_df
 
 def generate_permutations_poisson(industry_token, paired_list, num_permutations=None, lambda_poisson=1.0):
     """
@@ -92,7 +47,7 @@ def generate_permutations_poisson(industry_token, paired_list, num_permutations=
             selected_pairs = random.sample(paired_list, num_pairs_included)
             random.shuffle(selected_pairs)
             new_sequence = [industry_token]
-            new_sequence_back=[]
+            new_sequence_back = []
             for product_tokens, accelerator in selected_pairs:
                 new_sequence.extend(product_tokens)
                 new_sequence_back.append('Accelerator_' + accelerator)
@@ -102,8 +57,17 @@ def generate_permutations_poisson(industry_token, paired_list, num_permutations=
     return permutations
 
 def calculate_metrics(actual_accelerators, recommended_accelerators):
-    num_correct = len(
-        set(recommended_accelerators) & set(actual_accelerators))  # Intersection of actual and recommended
+    """
+    Calculate precision, recall, F1 score, and accuracy for the recommendations.
+
+    Args:
+        actual_accelerators (list): List of actual accelerators.
+        recommended_accelerators (list): List of recommended accelerators.
+
+    Returns:
+        tuple: (precision, recall, f1, accuracy)
+    """
+    num_correct = len(set(recommended_accelerators) & set(actual_accelerators))  # Intersection of actual and recommended
 
     precision = num_correct / len(recommended_accelerators) if recommended_accelerators else 0
     recall = num_correct / len(actual_accelerators) if actual_accelerators else 0
@@ -114,7 +78,25 @@ def calculate_metrics(actual_accelerators, recommended_accelerators):
 
     return precision, recall, f1, accuracy
 
-def process_fold(fold, train_index, test_index, all_companies, companies_df, company_products, company_accelerators,n, k, num_permutations):
+def process_fold(fold, train_index, test_index, all_companies, companies_df, company_products, company_accelerators, n, k, num_permutations):
+    """
+    Process a single fold: train models and evaluate them.
+
+    Args:
+        fold (int): Fold number.
+        train_index (array): Training indices.
+        test_index (array): Testing indices.
+        all_companies (list): List of all company names.
+        companies_df (DataFrame): DataFrame of companies.
+        company_products (dict): Mapping from companies to products and implementation status.
+        company_accelerators (dict): Mapping from companies to accelerators.
+        n (int): N for N-Gram model.
+        k (float): Smoothing parameter for N-Gram model.
+        num_permutations (int): Number of permutations to generate.
+
+    Returns:
+        dict: Metrics for both models.
+    """
     print(f"Processing Fold {fold}...")
 
     # Get train and test company names
@@ -169,11 +151,11 @@ def process_fold(fold, train_index, test_index, all_companies, companies_df, com
         test_sequences.append(sequence)
 
     # Train the Most Common Accelerator Model
+    most_common_model = create_most_common_model()
     train_accelerators = []
     for seq in train_sequences:
         train_accelerators.extend([token.replace('Accelerator_', '') for token in seq if token.startswith('Accelerator_')])
 
-    most_common_model = MostCommonModel()
     most_common_model.train(train_accelerators)
 
     # Evaluate the Most Common Model
@@ -197,10 +179,22 @@ def process_fold(fold, train_index, test_index, all_companies, companies_df, com
         'Accuracy': np.mean(accuracies_mc)
     }
 
-
-
     # Train the N-Gram Model
-    ngram_model = NGramModel(n=n, k=k,)
+    # Prepare base_tokens
+    base_tokens = []
+    for company in train_companies:
+        industry = companies_df.loc[companies_df['Name'] == company, 'Industry'].values[0]
+        industry_token = 'Industry_' + industry
+        products_impl_list = company_products.get(company, [])
+        accelerators = company_accelerators.get(company, [])
+        if len(products_impl_list) != len(accelerators):
+            continue
+        paired_list = list(zip(products_impl_list, [acc.replace('Accelerator_', '') for acc in accelerators]))
+        permutations = generate_permutations_poisson(industry_token, paired_list, num_permutations=num_permutations, lambda_poisson=1.0)
+        base_tokens.extend([acc for seq in permutations for acc in seq if acc.startswith('Accelerator_')])
+
+    # Train N-Gram model
+    ngram_model = create_ngram_model(n=n, k=k, base_tokens=base_tokens)
     ngram_model.train(train_sequences)
 
     # Evaluate the N-Gram Model
@@ -254,12 +248,38 @@ def process_fold(fold, train_index, test_index, all_companies, companies_df, com
     }
 
 def compute_mean_metrics(metrics_list):
+    """
+    Compute the mean of each metric across all folds.
+
+    Args:
+        metrics_list (list): List of metric dictionaries.
+
+    Returns:
+        dict: Mean metrics.
+    """
     mean_metrics = {}
     for metric in metrics_list[0].keys():
         mean_metrics[metric] = np.mean([m[metric] for m in metrics_list])
     return mean_metrics
 
-def run_parallel_folds(kf, company_indices, all_companies, companies_df, company_products, company_accelerators,n, k, num_permutations):
+def run_parallel_folds(kf, company_indices, all_companies, companies_df, company_products, company_accelerators, n, k, num_permutations):
+    """
+    Run cross-validation folds in parallel.
+
+    Args:
+        kf (KFold): K-Fold cross-validator.
+        company_indices (array): Array of company indices.
+        all_companies (list): List of all company names.
+        companies_df (DataFrame): DataFrame of companies.
+        company_products (dict): Mapping from companies to products and implementation status.
+        company_accelerators (dict): Mapping from companies to accelerators.
+        n (int): N for N-Gram model.
+        k (float): Smoothing parameter for N-Gram model.
+        num_permutations (int): Number of permutations to generate.
+
+    Returns:
+        tuple: Metrics for Most Common and N-Gram models.
+    """
     metrics_most_common = []
     metrics_ngram = []
 
@@ -269,7 +289,7 @@ def run_parallel_folds(kf, company_indices, all_companies, companies_df, company
         for fold, (train_index, test_index) in enumerate(kf.split(company_indices), 1):
             futures.append(executor.submit(
                 process_fold,
-                fold, train_index, test_index, all_companies, companies_df, company_products, company_accelerators,n, k, num_permutations
+                fold, train_index, test_index, all_companies, companies_df, company_products, company_accelerators, n, k, num_permutations
             ))
 
         for future in concurrent.futures.as_completed(futures):
@@ -279,8 +299,21 @@ def run_parallel_folds(kf, company_indices, all_companies, companies_df, company
 
     return metrics_most_common, metrics_ngram
 
-def run_tests(n, k, num_permutations):
-    companies_df, company_products, company_accelerators,accelerators_df = load_data()
+def run_tests(n=3, k=0.5, num_permutations=10):
+    """
+    Run cross-validation tests on both models.
+
+    Args:
+        n (int): N for N-Gram model.
+        k (float): Smoothing parameter for N-Gram model.
+        num_permutations (int): Number of permutations to generate.
+
+    Prints:
+        Aggregated metrics for both models.
+    """
+    companies_df, company_products, company_accelerators, accelerators_df = load_data()
+    accelerator_names_with_prefix = ["Accelerator_" + name for name in accelerators_df['Name'].tolist()]
+
 
     # Prepare the list of all company names
     all_companies = companies_df['Name'].tolist()
@@ -290,7 +323,7 @@ def run_tests(n, k, num_permutations):
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
     metrics_most_common, metrics_ngram = run_parallel_folds(
-        kf, company_indices, all_companies, companies_df, company_products, company_accelerators,n, k, num_permutations
+        kf, company_indices, all_companies, companies_df, company_products, company_accelerators, n, k, num_permutations
     )
 
     mean_metrics_most_common = compute_mean_metrics(metrics_most_common)
@@ -302,7 +335,7 @@ def run_tests(n, k, num_permutations):
     print("\nAggregated N-Gram Model Metrics:")
     print(mean_metrics_ngram)
 
-def train_and_use_ngram_model(n, k, num_permutations, sample_context):
+def train_and_use_ngram_model(n=3, k=0.5, num_permutations=10, sample_context=None):
     """
     Trains the N-Gram model using the entire dataset and makes recommendations on a sample context.
 
@@ -313,9 +346,15 @@ def train_and_use_ngram_model(n, k, num_permutations, sample_context):
         sample_context (list): Sample context to get recommendations for.
 
     Returns:
-        recommendations: List of recommended accelerators.
+        recommendations (list): List of recommended accelerators.
     """
-    companies_df, company_products, company_accelerators,accelerators_df = load_data()
+    if sample_context is None:
+        sample_context = ['Industry_Sports Equipment',
+                          'Product_Tibco Spotfire',
+                          'not_implemented',
+                          'Category_Business Intelligence and Analytics']
+
+    companies_df, company_products, company_accelerators, accelerators_df = load_data()
     accelerator_names_with_prefix = ["Accelerator_" + name for name in accelerators_df['Name'].tolist()]
     all_companies = companies_df['Name'].tolist()
 
@@ -343,7 +382,7 @@ def train_and_use_ngram_model(n, k, num_permutations, sample_context):
         train_sequences.extend(permutations)
 
     # Train the N-Gram model
-    ngram_model = NGramModel(n=n, k=k,base_tokens=accelerator_names_with_prefix)
+    ngram_model = create_ngram_model(n=n, k=k, base_tokens=accelerator_names_with_prefix)
     ngram_model.train(train_sequences)
 
     # Make recommendations for the sample context
@@ -352,17 +391,19 @@ def train_and_use_ngram_model(n, k, num_permutations, sample_context):
     return recommendations
 
 if __name__ == '__main__':
-    # Run tests
-    #run_tests(n=3, k=0.5, num_permutations=10)
+    # Run cross-validation tests
+    run_tests(n=3, k=0.5, num_permutations=10)
 
-    # Sample context tokens
-    sample_context = ['Industry_Sports Equipment',
-                      'Product_Tibco Spotfire',
-                      'not_implemented',
-                      'Category_Business Intelligence and Analytics']
+    # Sample context tokens for N-Gram model recommendations
+    sample_context = [
+        'Industry_Sports Equipment',
+        'Product_Tibco Spotfire',
+        'implemented',
+        'Category_Business Intelligence and Analytics'
+    ]
 
     # Train N-Gram model and get recommendations
-    recommendations = train_and_use_ngram_model(n=3, k=0.5, num_permutations=10, sample_context=sample_context)
+    recommendations = train_and_use_ngram_model(n=16, k=0.5, num_permutations=10, sample_context=sample_context)
 
     # Print the recommendations
     print("\nSample Recommendations from N-Gram Model:")
