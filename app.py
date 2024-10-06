@@ -178,11 +178,46 @@ def swipe():
     if not action or not card_id:
         return jsonify({"status": "error", "message": "Invalid data"}), 400
 
-    # Implement logic to store the swipe action (e.g., save to the database)
+    # Hash the user_id (or use another identifier)
+    user_hash = hashlib.sha256(user_id.encode()).hexdigest()
 
-    print(f"User {user_id} performed '{action}' on card {card_id}")
+    # Prepare the record to insert into MongoDB
+    record = {
+        'user_id_hash': user_hash,
+        'card_id': card_id,
+        'action': action,
+        'timestamp': datetime.utcnow()  # Add timestamp for tracking
+    }
 
-    return jsonify({"status": "success"})
+    # Insert the record into MongoDB
+    try:
+        users_collection.insert_one(record)
+    except Exception as e:
+        print(f"Error saving swipe to MongoDB: {e}")
+        return jsonify({"status": "error", "message": "Error saving swipe to database"}), 500
+
+    # Send swipe data to external server (localhost:8000)
+    external_api_url = "http://localhost:8000/api/swipe"
+    payload = {
+        "user_id": user_hash,  # Send the hashed user ID
+        "card_id": card_id,
+        "action": action
+    }
+
+    try:
+        # Send the request to the external server
+        response = requests.post(external_api_url, json=payload)
+
+        # Check if the external API request was successful
+        if response.status_code == 200:
+            return jsonify({"status": "success", "message": "Swipe recorded and forwarded successfully"}), 200
+        else:
+            print(f"Error sending swipe to external server: {response.status_code}, {response.text}")
+            return jsonify({"status": "error", "message": "Failed to send swipe to external server"}), 500
+
+    except Exception as e:
+        print(f"Error sending swipe to external server: {e}")
+        return jsonify({"status": "error", "message": "Error occurred while sending swipe to external server"}), 500
 
 
 
