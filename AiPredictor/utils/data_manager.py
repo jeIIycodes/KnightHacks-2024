@@ -97,6 +97,8 @@ def add_artificial_datapoints(n, product_name, description, category, percent_im
         existing_entitlements_df = pd.read_csv(entitlements_path, sep='\t')
     except pd.errors.ParserError as e:
         logger.error(f"Failed to parse {entitlements_path}: {e}")
+        logger.info("Attempting to restore from backup.")
+        restore_backup()
         raise
 
     # Concatenate new entries
@@ -121,6 +123,8 @@ def add_artificial_datapoints(n, product_name, description, category, percent_im
             products_df = pd.read_csv(products_path, sep='\t')
         except pd.errors.ParserError as e:
             logger.error(f"Failed to parse {products_path}: {e}")
+            logger.info("Attempting to restore from backup.")
+            restore_backup()
             raise
 
         # Check if product already exists
@@ -151,14 +155,21 @@ def add_artificial_datapoints(n, product_name, description, category, percent_im
             accelerators_df = pd.read_csv(accelerators_path, sep='\t')
         except pd.errors.ParserError as e:
             logger.error(f"Failed to parse {accelerators_path}: {e}")
+            logger.info("Attempting to restore from backup.")
+            restore_backup()
             raise
 
         # Define accelerator types to add
-        accelerator_types = ['Jumpstart', '  Up']
+        accelerator_types = ['Jumpstart', 'TuneUp']
 
+        # Collect new accelerator entries
+        new_accelerators = []
         for acc_type in accelerator_types:
             accelerator_name = f"{acc_type} Your {product_name}"
-            short_description = f"Kickstart your adoption of {product_name}!" if acc_type == 'Jumpstart' else f"Tune up your use of {product_name}!"
+            short_description = (
+                f"Kickstart your adoption of {product_name}!" if acc_type == 'Jumpstart'
+                else f"TuneUp your use of {product_name}!"
+            )
             accel_entry = {
                 'Name': sanitize_field(accelerator_name),
                 'Product': sanitize_field(product_name),
@@ -171,16 +182,17 @@ def add_artificial_datapoints(n, product_name, description, category, percent_im
                 logger.info(
                     f"Accelerator '{accelerator_name}' already exists in {accelerators_path}. Skipping addition.")
             else:
-                # Convert to DataFrame
-                accel_entry_df = pd.DataFrame([accel_entry])
-                # Concatenate
-                updated_accelerators_df = pd.concat([accelerators_df, accel_entry_df], ignore_index=True)
-                # Save back to accelerators.tsv
-                updated_accelerators_df.to_csv(accelerators_path, sep='\t', index=False)
-                logger.info(f"Added accelerator '{accelerator_name}' to {accelerators_path}.")
+                new_accelerators.append(accel_entry)
+
+        # If there are new accelerators, concatenate and update the file
+        if new_accelerators:
+            new_accel_df = pd.DataFrame(new_accelerators)
+            updated_accelerators_df = pd.concat([accelerators_df, new_accel_df], ignore_index=True)
+            # Save back to accelerators.tsv
+            updated_accelerators_df.to_csv(accelerators_path, sep='\t', index=False)
+            logger.info(f"Added new accelerators to {accelerators_path}.")
 
     logger.info("Artificial datapoints addition complete.")
-
 
 
 def restore_backup():
