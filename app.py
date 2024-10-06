@@ -108,7 +108,7 @@ def logout():
 @app.route("/quiz")
 @login_required
 def quiz():
-    return render_template("quiz.html", user=in_memory_users.get(session.get("user")))
+    return render_template("swipe_quiz.html", user=in_memory_users.get(session.get("user")))
 
 @app.route("/loading")
 @login_required
