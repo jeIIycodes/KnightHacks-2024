@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@kinde-oss/kinde-auth-react": "^4.0.4",
+    "bootstrap": "^5.3.3"
+  }
+}
