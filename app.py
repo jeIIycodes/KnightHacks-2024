@@ -1,6 +1,6 @@
 from datetime import date
-from flask import Flask, url_for, render_template, request, session, redirect, flash, jsonify
-from win32comext.shell.demos.servers.shell_view import debug
+from flask import Flask, url_for, render_template, request, session, redirect, flash, jsonify, send_from_directory
+from pymongo import MongoClient
 
 from flask_session import Session
 from functools import wraps
@@ -17,16 +17,11 @@ import os
 
 MIDNIGHT_API_URL = "https://midnight.network/api/store"  # Replace with the actual API URL
 
-MONGO_URI = "mongodb://localhost:27017"
-DATABASE_NAME = "company_db"
-USER_COLLECTION = "users"
 app = Flask(__name__)
 app.config.from_object("config")
 Session(app)
 
-client = MongoClient(MONGO_URI)
-db = client[DATABASE_NAME]
-users_collection = db[USER_COLLECTION]
+in_memory_users = {}
 
 configuration = Configuration(host=app.config["KINDE_ISSUER_URL"])
 kinde_api_client_params = {
@@ -109,8 +104,8 @@ def callback():
 
     user_id = data.get("id")
 
-    if not users_collection.find_one({"user_id": user_id}):
-        users_collection.insert_one({"user_id": user_id, **data})
+    if user_id not in in_memory_users:
+        in_memory_users[user_id] = data  # Store user data in memory
 
     if is_new_user(user_id):
         return redirect(url_for("company_assessment"))  # Redirect new users to assessment
@@ -167,8 +162,6 @@ def get_helper_functions():
             data["str_flag"] = kinde_client.get_string_flag("theme","red")
             data["int_flag"] = kinde_client.get_integer_flag("competitions_limit",10)
             template = "helpers.html"
-
-
 
         else:
             template = "logged_out.html"
@@ -254,9 +247,9 @@ def company_assessment():
     return render_template("company_assessment.html", form=form)
 
 @app.route("/swipe")
-def swipe_page():
+def serve_swipe():
     # user_id = session.get("user")
-    return render_template("swipe. html")
+    return render_template("index.html")
 
 @app.route("/dashboard")
 def dashboard():

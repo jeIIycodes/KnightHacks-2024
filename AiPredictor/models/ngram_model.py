@@ -1,4 +1,4 @@
-# models.py
+# ngram_model.py
 
 # Import necessary libraries
 import pandas as pd
