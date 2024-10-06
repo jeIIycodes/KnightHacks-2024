@@ -1,1 +1,1 @@
-//gallery.js
+//Gallery.js
