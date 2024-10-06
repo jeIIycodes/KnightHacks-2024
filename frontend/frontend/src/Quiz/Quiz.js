@@ -7,7 +7,6 @@ function Quiz({ onNext }) {
     <div>
       <h1>Quiz Page</h1>
       <p>This is where the questionnaire will go.</p>
-      <Button onClick={onNext}>Next</Button>
     </div>
   );
 }
