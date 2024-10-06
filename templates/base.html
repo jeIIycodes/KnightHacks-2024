@@ -4,42 +4,67 @@
 <head>
     <meta charset="UTF-8">
     <title>MATCHCELERATOR</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-    <div class="App">
-        <!-- Home Button -->
-        <button class="home-button" onclick="navigateTo('home')">Home</button>
-
-        <!-- Authentication Buttons / Profile Section -->
-        {% if user %}
-        <div class="profile-section">
-            <div class="profile-circle">
-                <img src="{{ user.picture or url_for('static', filename='images/placeholder.png') }}" alt="Profile" class="profile-image">
-            </div>
-            <p class="profile-name">{{ user.given_name or 'User' }}</p>
-            <button class="logout-button" onclick="logout()">Logout</button>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top">
+        <a class="navbar-brand" href="#" onclick="navigateTo('home')">
+            <span style="color: green; font-weight: bold;">MATCH</span>
+            <span style="color: black; font-weight: bold;">CELERATOR</span>
+        </a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+            <ul class="navbar-nav">
+                {% if user %}
+                <li class="nav-item">
+                    <div class="d-flex align-items-center">
+                        <div class="profile-circle mr-2">
+                            <img src="{{ user.picture or url_for('static', filename='images/placeholder.png') }}"
+                                 alt="Profile" class="profile-image">
+                        </div>
+                        <span class="profile-name mr-3">{{ user.given_name or 'User' }}</span>
+                        <button class="btn btn-outline-danger" onclick="logout()">Logout</button>
+                    </div>
+                </li>
+                {% else %}
+                <li class="nav-item">
+                    <button class="btn btn-outline-primary" onclick="login()">Login</button>
+                </li>
+                {% endif %}
+            </ul>
         </div>
-        {% else %}
-        <button class="auth-button" onclick="login()">Login</button>
-        {% endif %}
+    </nav>
 
-        <!-- Center Content -->
-        <div class="center-content">
-            <h1 class="heading">
-                <span style="color: green;">MATCH</span>
-                <span style="color: black;">CELERATOR</span>
-            </h1>
-            <h6 class="sub-heading">Find Your Perfect Accelerator!</h6>
-
-            <!-- Dynamic Content -->
-            <div id="content">
-                {% block content %}{% endblock %}
-            </div>
+    <!-- Main Content Area -->
+    <div class="container mt-5 pt-4">
+        <!-- Removed the title section -->
+        <!-- Dynamic Content -->
+        <div id="content">
+            {% block content %}{% endblock %}
         </div>
     </div>
 
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+            integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/
+            Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous">
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
+            integrity="sha384-
+            ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous">
+    </script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
+            integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+
+            76PVCmYl" crossorigin="anonymous">
+    </script>
+    <!-- Custom JS -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 from datetime import date
-from flask import Flask, url_for, render_template, request, session, redirect, flash
+from flask import Flask, url_for, render_template, request, session, redirect, flash, jsonify
 from flask_session import Session
 from functools import wraps
 
@@ -54,6 +54,62 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+
+
+# app.py
+
+@app.route("/api/get_cards")
+@login_required
+def get_cards():
+    # Replace with real data fetching logic
+    cards = [
+        {
+            "id": "1",
+            "title": "Accelerator Program A",
+            "imageUrl": "https://via.placeholder.com/318x180?text=Program+A",
+            "description": "Description for Accelerator Program A."
+        },
+        {
+            "id": "2",
+            "title": "Accelerator Program B",
+            "imageUrl": "https://via.placeholder.com/318x180?text=Program+B",
+            "description": "Description for Accelerator Program B."
+        },
+        # Add more card data as needed
+    ]
+    return jsonify({"cards": cards})
+
+
+# app.py
+
+# app.py
+
+@app.route("/api/swipe", methods=["POST"])
+@login_required
+def swipe():
+    data = request.json
+    action = data.get("action")  # 'like' or 'dislike'
+    card_id = data.get("card_id")  # Identifier for the card
+    user_id = session.get("user")
+
+    if not action or not card_id:
+        return jsonify({"status": "error", "message": "Invalid data"}), 400
+
+    # Implement logic to store the swipe action
+    # Example: Save to database
+    # db.swipes.insert_one({
+    #     "user_id": user_id,
+    #     "card_id": card_id,
+    #     "action": action,
+    #     "timestamp": datetime.utcnow()
+    # })
+
+    print(f"User {user_id} performed '{action}' on card {card_id}")
+
+    return jsonify({"status": "success"})
+
+
+
 @app.route("/")
 def index():
     if not session.get("user"):
@@ -63,7 +119,7 @@ def index():
         if kinde_client and kinde_client.is_authenticated():
             data = {"current_year": date.today().year}
             data.update(get_authorized_data(kinde_client))
-            return render_template("home.html", user=data)
+            return render_template("home.html", user=in_memory_users.get(session.get("user")))
     return render_template("logged_out.html")
 
 @app.route("/api/auth/login")
@@ -105,10 +161,13 @@ def logout():
         kinde_client.logout(redirect_to=app.config["LOGOUT_REDIRECT_URL"])
     )
 
+# app.py
+
 @app.route("/quiz")
 @login_required
 def quiz():
     return render_template("swipe_quiz.html", user=in_memory_users.get(session.get("user")))
+
 
 @app.route("/loading")
 @login_required
