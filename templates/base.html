@@ -1,11 +1,45 @@
+<!-- templates/base.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
-    <link rel="stylesheet" type="text/css" href= "{{ url_for('static',filename='css/globals.css') }}">
+    <title>MATCHCELERATOR</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
 </head>
 <body>
-{% block body %} {% endblock %}
+    <div class="App">
+        <!-- Home Button -->
+        <button class="home-button" onclick="navigateTo('home')">Home</button>
+
+        <!-- Authentication Buttons / Profile Section -->
+        {% if user %}
+        <div class="profile-section">
+            <div class="profile-circle">
+                <img src="{{ user.picture or url_for('static', filename='images/placeholder.png') }}" alt="Profile" class="profile-image">
+            </div>
+            <p class="profile-name">{{ user.given_name or 'User' }}</p>
+            <button class="logout-button" onclick="logout()">Logout</button>
+        </div>
+        {% else %}
+        <button class="auth-button" onclick="login()">Login</button>
+        {% endif %}
+
+        <!-- Center Content -->
+        <div class="center-content">
+            <h1 class="heading">
+                <span style="color: green;">MATCH</span>
+                <span style="color: black;">CELERATOR</span>
+            </h1>
+            <h6 class="sub-heading">Find Your Perfect Accelerator!</h6>
+
+            <!-- Dynamic Content -->
+            <div id="content">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

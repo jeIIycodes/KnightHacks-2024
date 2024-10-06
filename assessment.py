@@ -6,7 +6,7 @@ import pandas as pd
 def get_product_choices():
     try:
         df = pd.read_csv('./AiPredictor/data/accelerators.tsv', sep='\t')
-        choices = [(row['Product']) for index, row in df.iterrows()]
+        choices = [(row['Product'], row['Product']) for index, row in df.iterrows()]
         return choices
     except FileNotFoundError:
         return []

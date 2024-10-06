@@ -6,6 +6,17 @@ import shutil
 import random
 import numpy as np
 import logging
+import os
+import pandas as pd
+import shutil
+import random
+import numpy as np
+import logging
+import csv
+from io import StringIO
+from flask import Response, jsonify  # If not already imported
+
+from AiPredictor.db import users_collection, test_connection  # Ensure this is correctly pointing to your DB module
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -266,3 +277,158 @@ def make_backup():
         logger.info(f"Backed up {file} to {backup_file}.")
 
     logger.info("Backup of .tsv files completed successfully.")
+
+def import_from_mongodb():
+    """
+    Imports data from MongoDB and writes to multiple TSV files:
+    - companies.tsv
+    - company_entitlements.tsv
+    - entitlements.tsv
+    - products.tsv
+    - semantic_info.tsv
+
+    Raises:
+        Exception: If any operation fails during the import process.
+    """
+    try:
+        # Step 1: Create a Backup Before Making Changes
+        make_backup()
+
+        # Step 2: Define File Paths
+        data_dir = 'data'
+        companies_path = os.path.join(data_dir, 'companies.tsv')
+        company_entitlements_path = os.path.join(data_dir, 'company_entitlements.tsv')
+        entitlements_path = os.path.join(data_dir, 'entitlements.tsv')
+        products_path = os.path.join(data_dir, 'products.tsv')
+        semantic_info_path = os.path.join(data_dir, 'semantic_info.tsv')
+
+        # Step 3: Initialize DataFrames or Create Files if They Don't Exist
+        if os.path.exists(companies_path):
+            companies_df = pd.read_csv(companies_path, sep='\t')
+        else:
+            companies_df = pd.DataFrame(columns=['Name', 'Industry', 'programStart'])
+
+        if os.path.exists(company_entitlements_path):
+            company_entitlements_df = pd.read_csv(company_entitlements_path, sep='\t')
+        else:
+            company_entitlements_df = pd.DataFrame(columns=['Company', 'Product', 'Implemented', 'Accelerator'])
+
+        if os.path.exists(entitlements_path):
+            entitlements_df = pd.read_csv(entitlements_path, sep='\t')
+        else:
+            entitlements_df = pd.DataFrame(columns=['Company', 'Implemented', 'Product'])
+
+        if os.path.exists(products_path):
+            products_df = pd.read_csv(products_path, sep='\t')
+        else:
+            products_df = pd.DataFrame(columns=['Name', 'Industry', 'programStart'])
+
+        if os.path.exists(semantic_info_path):
+            semantic_info_df = pd.read_csv(semantic_info_path, sep='\t')
+        else:
+            semantic_info_df = pd.DataFrame(columns=['username_hash', 'company_size', 'challenges'])
+
+        # Step 4: Fetch Data from MongoDB
+        logger.info("Fetching data from MongoDB...")
+        records = users_collection.find()
+
+        # Step 5: Process Each Record
+        for record in records:
+            username_hash = record.get('username_hash')
+            company_name = record.get('company_name', 'UnknownCompany')
+            company_size = record.get('company_size', 'UnknownSize')
+            challenges = record.get('challenges', [])
+            industry = record.get('industry', 'UnknownIndustry')
+            program_start = record.get('programStart', 'UnknownDate')
+            products = record.get('products', [])
+            accelerators = record.get('accelerators', [])
+
+            # Sanitize username_hash to use as Company identifier
+            company_identifier = sanitize_field(username_hash)
+
+            # ---- Update companies.tsv ----
+            if company_identifier not in companies_df['Name'].values:
+                new_company = pd.DataFrame([{
+                    'Name': company_identifier,
+                    'Industry': industry,
+                    'programStart': program_start
+                }])
+                companies_df = pd.concat([companies_df, new_company], ignore_index=True)
+                logger.info(f"Added company '{company_identifier}' to companies.tsv.")
+
+            # ---- Update semantic_info.tsv ----
+            if company_identifier not in semantic_info_df['username_hash'].values:
+                challenges_str = '; '.join(challenges) if isinstance(challenges, list) else challenges
+                new_semantic_info = pd.DataFrame([{
+                    'username_hash': company_identifier,
+                    'company_size': company_size,
+                    'challenges': challenges_str
+                }])
+                semantic_info_df = pd.concat([semantic_info_df, new_semantic_info], ignore_index=True)
+                logger.info(f"Added semantic info for company '{company_identifier}' to semantic_info.tsv.")
+
+            # ---- Update products.tsv ----
+            for product in products:
+                product_name = sanitize_field(product.get('product_name', 'UnknownProduct'))
+                product_industry = sanitize_field(product.get('industry', industry))  # Use product's industry or company's
+                product_program_start = sanitize_field(product.get('programStart', program_start))
+
+                if product_name not in products_df['Name'].values:
+                    new_product = pd.DataFrame([{
+                        'Name': product_name,
+                        'Industry': product_industry,
+                        'programStart': product_program_start
+                    }])
+                    products_df = pd.concat([products_df, new_product], ignore_index=True)
+                    logger.info(f"Added product '{product_name}' to products.tsv.")
+
+                # ---- Update entitlements.tsv ----
+                implemented = 'TRUE' if product.get('implemented', False) else 'FALSE'
+                new_entitlement = pd.DataFrame([{
+                    'Company': company_identifier,
+                    'Implemented': implemented,
+                    'Product': product_name
+                }])
+                if not ((entitlements_df['Company'] == company_identifier) &
+                        (entitlements_df['Product'] == product_name)).any():
+                    entitlements_df = pd.concat([entitlements_df, new_entitlement], ignore_index=True)
+                    logger.info(
+                        f"Added entitlement for product '{product_name}' under company '{company_identifier}' to entitlements.tsv.")
+
+                # ---- Update company_entitlements.tsv ----
+                for acc in accelerators:
+                    acc_type = sanitize_field(acc.get('type', 'UnknownType'))
+                    if acc_type not in ['Jumpstart', 'TuneUp']:
+                        logger.warning(f"Unknown accelerator type '{acc_type}' for company '{company_identifier}'. Skipping.")
+                        continue
+
+                    accelerator_name = f"{acc_type} Your {product_name}"
+                    new_company_entitlement = pd.DataFrame([{
+                        'Company': company_identifier,
+                        'Product': product_name,
+                        'Implemented': implemented,
+                        'Accelerator': accelerator_name
+                    }])
+
+                    if not ((company_entitlements_df['Company'] == company_identifier) &
+                            (company_entitlements_df['Product'] == product_name) &
+                            (company_entitlements_df['Accelerator'] == accelerator_name)).any():
+                        company_entitlements_df = pd.concat([company_entitlements_df, new_company_entitlement],
+                                                            ignore_index=True)
+                        logger.info(
+                            f"Added company entitlement '{accelerator_name}' for product '{product_name}' under company '{company_identifier}' to company_entitlements.tsv.")
+
+        # Step 6: Save Updated DataFrames Back to TSV Files
+        logger.info("Saving updated TSV files...")
+        companies_df.to_csv(companies_path, sep='\t', index=False)
+        semantic_info_df.to_csv(semantic_info_path, sep='\t', index=False)
+        products_df.to_csv(products_path, sep='\t', index=False)
+        entitlements_df.to_csv(entitlements_path, sep='\t', index=False)
+        company_entitlements_df.to_csv(company_entitlements_path, sep='\t', index=False)
+        logger.info("All TSV files have been updated successfully.")
+
+    except Exception as e:
+        logger.error(f"Error during MongoDB import: {str(e)}")
+        restore_backup()
+        raise
+

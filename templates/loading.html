@@ -1,0 +1,13 @@
+<!-- templates/loading.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div>
+    <h1>Loading...</h1>
+    <!-- You can add a spinner or loading animation here -->
+    <div class="navigation-buttons">
+        <button class="back-button" onclick="navigateTo('quiz')">Back</button>
+        <button class="next-button" onclick="navigateTo('decisions')">Next</button>
+    </div>
+</div>
+{% endblock %}
