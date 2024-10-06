@@ -1,25 +1,19 @@
-import logo from './logo.svg';
-import './App.css';
+// App.js
+import React from 'react';
+import './App.css'; // If you have any global styles
+import CardSwiper from './card-swiper/CardSwiper'; // Import your CardSwiper component
 
 function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
+        <h1>Accelerator Project</h1>
+        {/* Render your CardSwiper component */}
+        <CardSwiper />
       </header>
     </div>
   );
 }
 
 export default App;
+

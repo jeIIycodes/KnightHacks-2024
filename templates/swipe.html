@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Accelerator Swipe UI</title>
     <style>
         /* Style for the swipe container and cards */
-        body, html {
+        body,
+        html {
             margin: 0;
             padding: 0;
             display: flex;
@@ -15,6 +17,7 @@
             height: 100vh;
             background-color: #f0f0f0;
             overflow: hidden;
+            font-family: Arial, sans-serif;
         }
 
         .container {
@@ -29,19 +32,26 @@
             height: 100%;
             border-radius: 10px;
             background: white;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             transition: transform 0.5s ease, opacity 0.5s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            cursor: grab;
         }
 
         .card img {
             width: 100%;
             height: 60%;
             border-radius: 10px 10px 0 0;
+            object-fit: cover;
         }
 
         .card-content {
             padding: 20px;
             text-align: center;
+            flex-grow: 1;
         }
 
         .hidden {
@@ -58,18 +68,20 @@
 
         .button-container {
             display: flex;
-            justify-content: center;
+            justify-content: space-between;
+            width: 60%;
             margin-top: 20px;
         }
 
-        .like-button, .dislike-button {
-            padding: 10px 20px;
-            margin: 0 10px;
+        .like-button,
+        .dislike-button {
+            padding: 15px 25px;
             border: none;
             border-radius: 5px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 18px;
             color: white;
+            transition: background-color 0.3s ease;
         }
 
         .like-button {
@@ -79,28 +91,33 @@
         .dislike-button {
             background-color: red;
         }
+
+        .like-button:hover {
+            background-color: #28a745;
+        }
+
+        .dislike-button:hover {
+            background-color: #dc3545;
+        }
     </style>
 </head>
+
 <body>
     <div class="container" id="card-container">
         <!-- Cards will be dynamically added here -->
     </div>
 
-    <div class="button-container">
-        <button class="like-button" onclick="like()">Like</button>
-        <button class="dislike-button" onclick="dislike()">Dislike</button>
-    </div>
-
     <script>
-        // Accelerator data embedded directly into the script
         const accelerators = [
-            {id: 1, name: "Accelerator 1", description: "Description of Accelerator 1", image: "https://via.placeholder.com/300x200.png?text=Accelerator+1"},
-            {id: 2, name: "Accelerator 2", description: "Description of Accelerator 2", image: "https://via.placeholder.com/300x200.png?text=Accelerator+2"},
-            {id: 3, name: "Accelerator 3", description: "Description of Accelerator 3", image: "https://via.placeholder.com/300x200.png?text=Accelerator+3"}
+            { id: 1, name: "Accelerator 1", description: "Description of Accelerator 1", image: "https://via.placeholder.com/300x200.png?text=Accelerator+1" },
+            { id: 2, name: "Accelerator 2", description: "Description of Accelerator 2", image: "https://via.placeholder.com/300x200.png?text=Accelerator+2" },
+            { id: 3, name: "Accelerator 3", description: "Description of Accelerator 3", image: "https://via.placeholder.com/300x200.png?text=Accelerator+3" }
         ];
 
         const cardContainer = document.getElementById('card-container');
         let currentCardIndex = 0;
+        let isDragging = false;
+        let startX = 0;
 
         // Function to create a card for each accelerator
         function createCard(accelerator) {
@@ -116,6 +133,12 @@
                 </div>
             `;
 
+            // Add mouse event listeners to the card for drag functionality
+            card.addEventListener('mousedown', onDragStart);
+            card.addEventListener('mousemove', onDragMove);
+            card.addEventListener('mouseup', onDragEnd);
+            card.addEventListener('mouseleave', onDragEnd);
+
             cardContainer.appendChild(card);
         }
 
@@ -126,43 +149,58 @@
         showCard(currentCardIndex);
 
         function showCard(index) {
-            // Hide all cards
             const cards = document.querySelectorAll('.card');
             cards.forEach(card => card.style.display = 'none');
-
-            // Show the current card
             const cardToShow = document.getElementById(`card-${accelerators[index].id}`);
-            cardToShow.style.display = 'block';
+            if (cardToShow) cardToShow.style.display = 'block';
         }
 
-        // Swipe logic for like and dislike actions
-        function like() {
-            if (currentCardIndex < accelerators.length) {
-                const currentCard = document.getElementById(`card-${accelerators[currentCardIndex].id}`);
-                currentCard.classList.add('liked');
-                setTimeout(() => {
-                    currentCard.style.display = 'none';
-                    currentCardIndex++;
-                    if (currentCardIndex < accelerators.length) {
-                        showCard(currentCardIndex);
-                    }
-                }, 300);
+        function onDragStart(event) {
+            isDragging = true;
+            startX = event.clientX;
+            this.style.cursor = 'grabbing';
+        }
+
+        function onDragMove(event) {
+            if (!isDragging) return;
+            const currentCard = event.currentTarget;
+            const deltaX = event.clientX - startX;
+            currentCard.style.transform = `translateX(${deltaX}px)`;
+        }
+
+        function onDragEnd(event) {
+            if (!isDragging) return;
+            isDragging = false;
+            this.style.cursor = 'grab';
+
+            const deltaX = event.clientX - startX;
+            const threshold = 100; // Minimum distance to consider as a swipe
+
+            if (Math.abs(deltaX) > threshold) {
+                const action = deltaX > 0 ? 'liked' : 'disliked';
+                handleSwipe(action);
+            } else {
+                event.currentTarget.style.transform = 'translateX(0)'; // Reset position if swipe distance is too small
             }
         }
 
-        function dislike() {
-            if (currentCardIndex < accelerators.length) {
-                const currentCard = document.getElementById(`card-${accelerators[currentCardIndex].id}`);
-                currentCard.classList.add('disliked');
-                setTimeout(() => {
-                    currentCard.style.display = 'none';
-                    currentCardIndex++;
-                    if (currentCardIndex < accelerators.length) {
-                        showCard(currentCardIndex);
-                    }
-                }, 300);
-            }
+        function handleSwipe(action) {
+            const currentCard = document.getElementById(`card-${accelerators[currentCardIndex].id}`);
+            currentCard.classList.add(action);
+
+            const direction = action === 'liked' ? 'translateX(200%)' : 'translateX(-200%)';
+            currentCard.style.transform = direction;
+            currentCard.style.opacity = '0';
+
+            setTimeout(() => {
+                currentCard.style.display = 'none';
+                currentCardIndex++;
+                if (currentCardIndex < accelerators.length) {
+                    showCard(currentCardIndex);
+                }
+            }, 300);
         }
     </script>
 </body>
+
 </html>

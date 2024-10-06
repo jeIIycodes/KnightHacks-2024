@@ -1,16 +1,13 @@
-// DOM
+// script.js
+
+// DOM elements
 const swiper = document.querySelector('#swiper');
 const like = document.querySelector('#like');
 const dislike = document.querySelector('#dislike');
 
-// constants
-const urls = [
-  'https://source.unsplash.com/random/1000x1000/?sky',
-  'https://source.unsplash.com/random/1000x1000/?landscape',
-  'https://source.unsplash.com/random/1000x1000/?ocean',
-  'https://source.unsplash.com/random/1000x1000/?moutain',
-  'https://source.unsplash.com/random/1000x1000/?forest'
-];
+console.log("Swiper Element:", swiper); // Check if swiper is selected
+console.log("Like Element:", like);
+console.log("Dislike Element:", dislike);
 
 // variables
 let cardCount = 0;
@@ -18,18 +15,21 @@ let cardCount = 0;
 // functions
 function appendNewCard() {
   const card = new Card({
-    imageUrl: urls[cardCount % 5],
     onDismiss: appendNewCard,
     onLike: () => {
+      console.log("Card liked");
       like.style.animationPlayState = 'running';
       like.classList.toggle('trigger');
     },
     onDislike: () => {
+      console.log("Card disliked");
       dislike.style.animationPlayState = 'running';
       dislike.classList.toggle('trigger');
     }
   });
+
   swiper.append(card.element);
+  console.log("Appended new card element:", card.element); // Log the created card element
   cardCount++;
 
   const cards = swiper.querySelectorAll('.card:not(.dismissing)');
@@ -38,7 +38,8 @@ function appendNewCard() {
   });
 }
 
-// first 5 cards
+
+// Create the first 5 placeholder cards
 for (let i = 0; i < 5; i++) {
   appendNewCard();
 }

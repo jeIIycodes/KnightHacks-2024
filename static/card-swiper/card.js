@@ -1,11 +1,11 @@
 class Card {
   constructor({
-    imageUrl,
+    title = "Card Title", // Default title text
+    description = "This is a description for the card.", // Default description text
     onDismiss,
     onLike,
     onDislike
   }) {
-    this.imageUrl = imageUrl;
     this.onDismiss = onDismiss;
     this.onLike = onLike;
     this.onDislike = onDislike;
@@ -26,9 +26,13 @@ class Card {
   #init = () => {
     const card = document.createElement('div');
     card.classList.add('card');
-    const img = document.createElement('img');
-    img.src = this.imageUrl;
-    card.append(img);
+
+    // Create a placeholder element for the card content
+    const placeholder = document.createElement('div');
+    placeholder.classList.add('placeholder');
+    placeholder.textContent = 'Placeholder Card'; // Add placeholder text
+    card.append(placeholder);
+
     this.element = card;
     if (this.#isTouchDevice()) {
       this.#listenToTouchEvents();
@@ -92,7 +96,6 @@ class Card {
     this.element.style.transform = '';
   }
 
-  // touch event handlers
   #handleTouchMove = (e) => {
     if (!this.#startPoint) return;
     const touch = e.changedTouches[0];
@@ -130,3 +133,4 @@ class Card {
     }
   }
 }
+
