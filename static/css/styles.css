@@ -1,143 +1,207 @@
 /* static/css/styles.css */
-.App {
-    min-height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    position: relative;
-    background: linear-gradient(to right, #e91e63, #fad0c4, #b3e5fc, #90caf9);
-    background-size: 400% 400%;
-    animation: gradientAnimation 15s ease infinite;
+
+/* Reset some basic styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-@keyframes gradientAnimation {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+html, body {
+  width: 100vw;
+  height: 100vh;
+  overflow-x: hidden;
 }
 
-/* Home Button */
-.home-button {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    padding: 10px 20px;
-    font-size: 18px;
-    background-color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-weight: bold;
-}
-
-/* Login Button */
-.auth-button {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    padding: 10px 20px;
-    font-size: 18px;
-    background-color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-weight: bold;
+body {
+  /* Adjust padding to prevent content being hidden behind fixed navbar */
+  padding-top: 70px; /* Height of the navbar */
+  background: linear-gradient(0deg, rgb(255, 96, 54), rgb(253, 38, 122)) no-repeat;
 }
 
 /* Profile Section */
 .profile-section {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
+  display: flex;
+  align-items: center;
 }
 
-/* Profile Picture */
 .profile-circle {
-    width: 75px;
-    height: 75px;
-    border-radius: 50%;
-    overflow: hidden;
-    border: 2px solid #fff;
-    margin-bottom: 10px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #fff;
+  margin-right: 10px;
 }
 
 .profile-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-/* User Name */
 .profile-name {
-    color: white;
-    margin-top: 5px;
-    font-size: 14px;
-    font-weight: bold;
+  margin-right: 15px;
+  font-weight: bold;
 }
 
-/* Logout Button */
-.logout-button {
-    margin-top: 10px;
-    padding: 10px 20px;
-    font-size: 18px;
-    background-color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-weight: bold;
+/* Swipe Container Adjustments */
+.swipe-container {
+  position: relative;
+  width: 100%; /* Full width of the container */
+  max-width: 800px; /* Increased max-width for wider cards */
+  height: 600px; /* Adjust height as needed */
+  perspective: 1000px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 auto; /* Center the swipe container */
 }
 
-/* Center Content */
-.center-content {
-    text-align: center;
+/* Like and Dislike Buttons Positioning */
+.swipe-button.like-button {
+  position: absolute;
+  left: 460px; /* Position to the left of swiper */
+  top: 50%;
+  transform: translateY(-50%);
 }
 
-.heading {
-    font-size: 48px;
-    margin: 0;
+.swipe-button.dislike-button {
+  position: absolute;
+  right: 460px; /* Position to the right of swiper */
+  top: 50%;
+  transform: translateY(-50%);
 }
 
-.sub-heading {
-    font-size: 24px;
-    color: white;
-    margin-top: 10px;
+/* Ensure buttons are visible and clickable */
+.swipe-button {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.8);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.3s, transform 0.3s;
+  z-index: 2;
 }
 
-.quiz-button {
-    padding: 15px 30px;
-    font-weight: bold;
-    font-size: 24px;
-    background-color: #FFFFFF;
-    color: black;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    margin-top: 20px;
+.swipe-button:hover {
+  background-color: rgba(255, 255, 255, 1);
+  transform: translateY(-50%) scale(1.1);
 }
 
-.navigation-buttons {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-    padding: 20px;
-    position: absolute;
-    bottom: 20px;
+/* Ionicons Styling */
+ion-icon {
+  font-size: 2rem;
+  color: #dc3545; /* Default color */
 }
 
-.back-button, .next-button {
-    padding: 10px 20px;
-    font-size: 16px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
+.like-button ion-icon {
+  color: #28a745; /* Green for like */
 }
 
-.back-button:hover, .next-button:hover {
-    background-color: #45a049;
+.dislike-button ion-icon {
+  color: #dc3545; /* Red for dislike */
+}
+
+/* Feedback Messages Styling */
+.feedback {
+  position: fixed;
+  top: 50px; /* Adjusted to be further down */
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(40, 167, 69, 0.9); /* Green for like */
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 1rem;
+  opacity: 0;
+  animation: fadeInOut 1s forwards;
+  z-index: 1000;
+}
+
+.feedback.dislike {
+  background-color: rgba(220, 53, 69, 0.9); /* Red for dislike */
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+
+.feedback.dislike {
+  background-color: rgba(220, 53, 69, 0.9); /* Red for dislike */
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Swipe Container */
+.swipe-container {
+  position: relative;
+  width: 100%;
+  max-width: 800px; /* Adjusted for wider cards */
+  height: 600px;
+  perspective: 1000px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 auto;
+}
+
+/* Card Styling */
+.card {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  border-radius: 20px;
+  background: #fff; /* Solid white background */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.5s;
+  overflow: hidden;
+}
+
+.card img {
+  height: 200px;
+  object-fit: cover;
+}
+
+.card-header {
+  background-color: #f8f9fa;
+  font-size: 1.25rem;
+  font-weight: bold;
+  text-align: center;
+}
+
+.card-body {
+  padding: 1rem;
+}
+
+/* Dismissing Cards */
+#swiper .dismissing {
+  opacity: 0;
+}
+
+/* Button Animation */
+.swipe-container .active {
+  animation: buttonFlash 0.5s;
+}
+
+@keyframes buttonFlash {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
 }

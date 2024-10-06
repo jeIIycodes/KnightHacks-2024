@@ -1,5 +1,9 @@
+import random
+import re
 from datetime import date
-from flask import Flask, url_for, render_template, request, session, redirect, flash
+
+import requests
+from flask import Flask, url_for, render_template, request, session, redirect, flash, jsonify, current_app
 from flask_session import Session
 from functools import wraps
 
@@ -20,6 +24,38 @@ Session(app)
 # In-memory storage for users and clients
 in_memory_users = {}
 user_clients = {}
+
+
+# Function to extract company name using Regex
+def extract_company_name(accelerator_name):
+    match = re.search(r"Your (.+)", accelerator_name)
+    if match:
+        return match.group(1).replace(" ", "")  # Remove spaces from the company name
+    return None
+
+
+# Function to get the company logo or a random one if not found
+def get_company_logo(company_name):
+    # Get the full path of the logos folder in the static directory
+    logos_folder = os.path.join(current_app.root_path, 'static', 'img', 'logos')
+
+    # If company_name is provided, check for its logo
+    if company_name:
+        logo_filename = f"{company_name}.png"
+        logo_path = os.path.join(logos_folder, logo_filename)
+        if os.path.exists(logo_path):
+            # Return the URL for the company's logo
+            return url_for('static', filename=f'img/logos/{logo_filename}')
+
+    # If company logo is not found, select a random logo from the folder
+    logos = os.listdir(logos_folder)
+    if logos:
+        random_logo = random.choice(logos)
+        return url_for('static', filename=f'img/logos/{random_logo}')
+
+    # If no logos are available, return a default logo image (optional)
+    return url_for('static', filename='img/logos/default.png')
+
 
 # Kinde Configuration
 configuration = Configuration(host=app.config["KINDE_ISSUER_URL"])
@@ -54,6 +90,84 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+
+# Route to fetch cards from the external API
+@app.route("/api/get_cards", methods=["POST", "GET"])
+@login_required
+def get_cards():
+    # Define the URL for the external API (localhost:8000)
+    external_api_url = "http://localhost:8000/recommend/get_recommendations"
+
+    # Example data to send in the POST request
+    payload = {
+        "company_name": "AlphaArt",
+        "implemented_products": ["Alteryx", "BetaRix"],
+        "implemented_products_is_implemented": [False, False],
+        "industry": "Art Subscription Box",
+        "program_start_date": "2022-05-09",
+        "company_size": 50,
+        "location": "New York, USA",
+        "Optional Company Description": "Hey, this is what we do and how we do it.",
+        "current_challenges": ["Data analytics automation", "Customer engagement"],
+        "number_of_recommendations": 40
+    }
+
+    try:
+        # Send the request to the external API
+        response = requests.post(external_api_url, json=payload)
+
+        # Check if the request was successful
+        if response.status_code == 200:
+            # Parse the response JSON data
+            recommendations = response.json().get('recommendations', [])
+
+            # Format the recommendations into card data for the frontend
+            cards = []
+            for i, rec in enumerate(recommendations):
+                # Extract company name from accelerator name
+                company_name = extract_company_name(rec["accelerator"])
+
+                # Find the appropriate image or get a random one
+                image_url = get_company_logo(company_name) if company_name else get_company_logo(None)
+
+                # Append the card data
+                cards.append({
+                    "id": str(i + 1),
+                    "title": rec["accelerator"],
+                    "imageUrl": image_url,
+                    "description": rec["description"]
+                })
+
+            return jsonify({"cards": cards})
+        else:
+            # If the external API request fails, return an error message
+            return jsonify({"error": "Failed to fetch cards from external API."}), 500
+
+    except Exception as e:
+        # Catch any exceptions during the request
+        print(f"Error fetching cards: {e}")
+        return jsonify({"error": "An error occurred while fetching cards."}), 500
+
+# Route to handle swipe actions
+@app.route("/api/swipe", methods=["POST"])
+@login_required
+def swipe():
+    data = request.json
+    action = data.get("action")  # 'like' or 'dislike'
+    card_id = data.get("card_id")  # Identifier for the card
+    user_id = session.get("user")
+
+    if not action or not card_id:
+        return jsonify({"status": "error", "message": "Invalid data"}), 400
+
+    # Implement logic to store the swipe action (e.g., save to the database)
+
+    print(f"User {user_id} performed '{action}' on card {card_id}")
+
+    return jsonify({"status": "success"})
+
+
+
 @app.route("/")
 def index():
     if not session.get("user"):
@@ -63,7 +177,7 @@ def index():
         if kinde_client and kinde_client.is_authenticated():
             data = {"current_year": date.today().year}
             data.update(get_authorized_data(kinde_client))
-            return render_template("home.html", user=data)
+            return render_template("home.html", user=in_memory_users.get(session.get("user")))
     return render_template("logged_out.html")
 
 @app.route("/api/auth/login")
@@ -105,10 +219,13 @@ def logout():
         kinde_client.logout(redirect_to=app.config["LOGOUT_REDIRECT_URL"])
     )
 
+# app.py
+
 @app.route("/quiz")
 @login_required
 def quiz():
     return render_template("swipe_quiz.html", user=in_memory_users.get(session.get("user")))
+
 
 @app.route("/loading")
 @login_required

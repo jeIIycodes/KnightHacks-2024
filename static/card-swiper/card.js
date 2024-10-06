@@ -1,7 +1,10 @@
+// static/card-swiper/card.js
+
 class Card {
   constructor({
-    title = "Card Title", // Default title text
-    description = "This is a description for the card.", // Default description text
+    title = "Card Title",
+    imageUrl = "https://via.placeholder.com/318x180",
+    description = "This is a description for the card.",
     onDismiss,
     onLike,
     onDislike
@@ -9,10 +12,13 @@ class Card {
     this.onDismiss = onDismiss;
     this.onLike = onLike;
     this.onDislike = onDislike;
+    this.title = title;
+    this.imageUrl = imageUrl;
+    this.description = description;
     this.#init();
   }
 
-  // private properties
+  // Private properties
   #startPoint;
   #offsetX;
   #offsetY;
@@ -25,15 +31,33 @@ class Card {
 
   #init = () => {
     const card = document.createElement('div');
-    card.classList.add('card');
+    card.classList.add('card', 'mb-3'); // Added 'mb-3' for spacing
 
-    // Create a placeholder element for the card content
-    const placeholder = document.createElement('div');
-    placeholder.classList.add('placeholder');
-    placeholder.textContent = 'Placeholder Card'; // Add placeholder text
-    card.append(placeholder);
+    // Bootstrap Card Header (Title)
+    const cardHeader = document.createElement('div');
+    cardHeader.classList.add('card-header');
+    cardHeader.textContent = this.title;
+    card.appendChild(cardHeader);
+
+    // Bootstrap Card Image
+    const cardImage = document.createElement('img');
+    cardImage.classList.add('card-img-top');
+    cardImage.src = this.imageUrl;
+    cardImage.alt = "Card image cap";
+    card.appendChild(cardImage);
+
+    // Bootstrap Card Body (Description)
+    const cardBody = document.createElement('div');
+    cardBody.classList.add('card-body');
+    const cardText = document.createElement('p');
+    cardText.classList.add('card-text');
+    cardText.textContent = this.description;
+    cardBody.appendChild(cardText);
+    card.appendChild(cardBody);
 
     this.element = card;
+    this.element.cardInstance = this; // Store reference
+
     if (this.#isTouchDevice()) {
       this.#listenToTouchEvents();
     } else {
@@ -65,7 +89,7 @@ class Card {
 
     document.addEventListener('mouseup', this.#handleMoveUp);
 
-    // prevent card from being dragged
+    // Prevent card from being dragged
     this.element.addEventListener('dragstart', (e) => {
       e.preventDefault();
     });
@@ -76,13 +100,14 @@ class Card {
     this.#offsetY = y - this.#startPoint.y;
     const rotate = this.#offsetX * 0.1;
     this.element.style.transform = `translate(${this.#offsetX}px, ${this.#offsetY}px) rotate(${rotate}deg)`;
-    // dismiss card
+
+    // Dismiss card if moved beyond threshold
     if (Math.abs(this.#offsetX) > this.element.clientWidth * 0.7) {
-      this.#dismiss(this.#offsetX > 0 ? 1 : -1);
+      this.dismiss(this.#offsetX > 0 ? 1 : -1); // Use public method
     }
   }
 
-  // mouse event handlers
+  // Mouse event handlers
   #handleMouseMove = (e) => {
     e.preventDefault();
     if (!this.#startPoint) return;
@@ -122,6 +147,7 @@ class Card {
     setTimeout(() => {
       this.element.remove();
     }, 1000);
+
     if (typeof this.onDismiss === 'function') {
       this.onDismiss();
     }
@@ -132,5 +158,9 @@ class Card {
       this.onDislike();
     }
   }
-}
 
+  // Public method to trigger dismiss
+  dismiss(direction) {
+    this.#dismiss(direction);
+  }
+}
