@@ -1,5 +1,9 @@
+import random
+import re
 from datetime import date
-from flask import Flask, url_for, render_template, request, session, redirect, flash, jsonify
+
+import requests
+from flask import Flask, url_for, render_template, request, session, redirect, flash, jsonify, current_app
 from flask_session import Session
 from functools import wraps
 
@@ -20,6 +24,38 @@ Session(app)
 # In-memory storage for users and clients
 in_memory_users = {}
 user_clients = {}
+
+
+# Function to extract company name using Regex
+def extract_company_name(accelerator_name):
+    match = re.search(r"Your (.+)", accelerator_name)
+    if match:
+        return match.group(1).replace(" ", "")  # Remove spaces from the company name
+    return None
+
+
+# Function to get the company logo or a random one if not found
+def get_company_logo(company_name):
+    # Get the full path of the logos folder in the static directory
+    logos_folder = os.path.join(current_app.root_path, 'static', 'img', 'logos')
+
+    # If company_name is provided, check for its logo
+    if company_name:
+        logo_filename = f"{company_name}.png"
+        logo_path = os.path.join(logos_folder, logo_filename)
+        if os.path.exists(logo_path):
+            # Return the URL for the company's logo
+            return url_for('static', filename=f'img/logos/{logo_filename}')
+
+    # If company logo is not found, select a random logo from the folder
+    logos = os.listdir(logos_folder)
+    if logos:
+        random_logo = random.choice(logos)
+        return url_for('static', filename=f'img/logos/{random_logo}')
+
+    # If no logos are available, return a default logo image (optional)
+    return url_for('static', filename='img/logos/default.png')
+
 
 # Kinde Configuration
 configuration = Configuration(host=app.config["KINDE_ISSUER_URL"])
@@ -55,35 +91,64 @@ def login_required(f):
     return decorated_function
 
 
-
-# app.py
-
-@app.route("/api/get_cards")
+# Route to fetch cards from the external API
+@app.route("/api/get_cards", methods=["POST", "GET"])
 @login_required
 def get_cards():
-    # Replace with real data fetching logic
-    cards = [
-        {
-            "id": "1",
-            "title": "Accelerator Program A",
-            "imageUrl": "https://via.placeholder.com/318x180?text=Program+A",
-            "description": "Description for Accelerator Program A."
-        },
-        {
-            "id": "2",
-            "title": "Accelerator Program B",
-            "imageUrl": "https://via.placeholder.com/318x180?text=Program+B",
-            "description": "Description for Accelerator Program B."
-        },
-        # Add more card data as needed
-    ]
-    return jsonify({"cards": cards})
+    # Define the URL for the external API (localhost:8000)
+    external_api_url = "http://localhost:8000/recommend/get_recommendations"
 
+    # Example data to send in the POST request
+    payload = {
+        "company_name": "AlphaArt",
+        "implemented_products": ["Alteryx", "BetaRix"],
+        "implemented_products_is_implemented": [False, False],
+        "industry": "Art Subscription Box",
+        "program_start_date": "2022-05-09",
+        "company_size": 50,
+        "location": "New York, USA",
+        "Optional Company Description": "Hey, this is what we do and how we do it.",
+        "current_challenges": ["Data analytics automation", "Customer engagement"],
+        "number_of_recommendations": 40
+    }
 
-# app.py
+    try:
+        # Send the request to the external API
+        response = requests.post(external_api_url, json=payload)
 
-# app.py
+        # Check if the request was successful
+        if response.status_code == 200:
+            # Parse the response JSON data
+            recommendations = response.json().get('recommendations', [])
 
+            # Format the recommendations into card data for the frontend
+            cards = []
+            for i, rec in enumerate(recommendations):
+                # Extract company name from accelerator name
+                company_name = extract_company_name(rec["accelerator"])
+
+                # Find the appropriate image or get a random one
+                image_url = get_company_logo(company_name) if company_name else get_company_logo(None)
+
+                # Append the card data
+                cards.append({
+                    "id": str(i + 1),
+                    "title": rec["accelerator"],
+                    "imageUrl": image_url,
+                    "description": rec["description"]
+                })
+
+            return jsonify({"cards": cards})
+        else:
+            # If the external API request fails, return an error message
+            return jsonify({"error": "Failed to fetch cards from external API."}), 500
+
+    except Exception as e:
+        # Catch any exceptions during the request
+        print(f"Error fetching cards: {e}")
+        return jsonify({"error": "An error occurred while fetching cards."}), 500
+
+# Route to handle swipe actions
 @app.route("/api/swipe", methods=["POST"])
 @login_required
 def swipe():
@@ -95,14 +160,7 @@ def swipe():
     if not action or not card_id:
         return jsonify({"status": "error", "message": "Invalid data"}), 400
 
-    # Implement logic to store the swipe action
-    # Example: Save to database
-    # db.swipes.insert_one({
-    #     "user_id": user_id,
-    #     "card_id": card_id,
-    #     "action": action,
-    #     "timestamp": datetime.utcnow()
-    # })
+    # Implement logic to store the swipe action (e.g., save to the database)
 
     print(f"User {user_id} performed '{action}' on card {card_id}")
 

@@ -121,9 +121,10 @@ ion-icon {
 
 
 
+/* Feedback Messages Styling */
 .feedback {
   position: fixed;
-  top: 20px;
+  top: 100px !important; /* Increase the top value and use !important to override other rules */
   left: 50%;
   transform: translateX(-50%);
   background-color: rgba(40, 167, 69, 0.9); /* Green for like */
