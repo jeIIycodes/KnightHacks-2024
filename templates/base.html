@@ -6,6 +6,57 @@
     <title>MATCHCELERATOR</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <style>
+        body {
+            background: linear-gradient(to right, #e91e63, #fad0c4, #b3e5fc, #90caf9);
+            background-size: 400% 400%;
+            animation: gradientAnimation 15s ease infinite;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        @keyframes gradientAnimation {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+        
+        /* Button Styles */
+        .quiz-button, .back-button, .next-button, .logout-button, .home-button {
+            padding: 15px 30px;
+            font-weight: bold;
+            font-size: 18px;
+            background-color: #FFFFFF;
+            color: #e91e63;
+            border: 3px solid #e91e63;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.3s ease, background-color 0.3s ease;
+        }
+
+        /* Center Content */
+        .center-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+        }
+
+        .quiz-button:hover, .back-button:hover, .next-button:hover, 
+        .logout-button:hover, .home-button:hover {
+            background-color: #e91e63;
+            color: #FFFFFF;
+            transform: scale(1.1);
+        }
+    </style>
 </head>
 <body>
     <div class="App">
@@ -28,10 +79,14 @@
         <!-- Center Content -->
         <div class="center-content">
             <h1 class="heading">
-                <span style="color: green;">MATCH</span>
+                <span style="color: #e91e63;">MATCH</span>
                 <span style="color: black;">CELERATOR</span>
             </h1>
-            <h6 class="sub-heading">Find Your Perfect Accelerator!</h6>
+
+            <h6 class="sub-heading">
+                <span style="color: white;">The Perfect Accelerator is Just a Match Away!</span>
+            </h6>
+            
 
             <!-- Dynamic Content -->
             <div id="content">

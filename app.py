@@ -120,10 +120,14 @@ def loading():
 def decisions():
     return render_template("decisions.html", user=in_memory_users.get(session.get("user")))
 
-@app.route("/results")
+@app.route("/gallery")
 @login_required
-def results():
+def gallery():
     return render_template("gallery.html", user=in_memory_users.get(session.get("user")))
+
+@app.route('/results')
+def results():
+    return render_template('results.html')
 
 @app.route("/company_assessment", methods=["GET", "POST"])
 def company_assessment():
