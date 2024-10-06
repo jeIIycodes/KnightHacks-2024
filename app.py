@@ -1,5 +1,5 @@
 from datetime import date
-from flask import Flask, url_for, render_template, request, session, redirect, flash
+from flask import Flask, url_for, render_template, request, session, redirect, flash, jsonify
 from win32comext.shell.demos.servers.shell_view import debug
 
 from flask_session import Session
@@ -11,14 +11,22 @@ from kinde_sdk.kinde_api_client import GrantType, KindeApiClient
 from kinde_sdk.apis.tags import users_api
 from kinde_sdk.model.user import User
 
+
 import requests
 import os
 
 MIDNIGHT_API_URL = "https://midnight.network/api/store"  # Replace with the actual API URL
 
+MONGO_URI = "mongodb://localhost:27017"
+DATABASE_NAME = "company_db"
+USER_COLLECTION = "users"
 app = Flask(__name__)
 app.config.from_object("config")
 Session(app)
+
+client = MongoClient(MONGO_URI)
+db = client[DATABASE_NAME]
+users_collection = db[USER_COLLECTION]
 
 configuration = Configuration(host=app.config["KINDE_ISSUER_URL"])
 kinde_api_client_params = {
@@ -34,8 +42,6 @@ if app.config["GRANT_TYPE"] == GrantType.AUTHORIZATION_CODE_WITH_PKCE:
 
 kinde_client = KindeApiClient(**kinde_api_client_params)
 user_clients = {}
-
-
 
 def get_authorized_data(kinde_client):
     user = kinde_client.get_user_details()
@@ -61,6 +67,18 @@ def login_required(user):
 
 @app.route("/")
 def index():
+    # Directly navigate to the login page if the user is not authenticated.
+    if not session.get("user"):
+        return redirect(url_for("login"))  # Redirect to login
+    else:
+        kinde_client = user_clients.get(session.get("user"))
+        if kinde_client and kinde_client.is_authenticated():
+            data = {"current_year": date.today().year}
+            data.update(get_authorized_data(kinde_client))
+            return render_template("home.html", **data)
+    return render_template("logged_out.html")
+"""
+def index():
     data = {"current_year": date.today().year}
     template = "logged_out.html"
     if session.get("user"):
@@ -69,7 +87,7 @@ def index():
             data.update(get_authorized_data(kinde_client))        
             template = "home.html"
     return render_template(template, **data)
-
+"""
 
 @app.route("/api/auth/login")
 def login():
@@ -88,8 +106,21 @@ def callback():
     data.update(get_authorized_data(kinde_client))
     session["user"] = data.get("id")
     user_clients[data.get("id")] = kinde_client
-    return app.redirect(url_for("index"))
 
+    user_id = data.get("id")
+
+    if not users_collection.find_one({"user_id": user_id}):
+        users_collection.insert_one({"user_id": user_id, **data})
+
+    if is_new_user(user_id):
+        return redirect(url_for("company_assessment"))  # Redirect new users to assessment
+
+    return redirect(url_for("index"))
+
+completed_assessment_users = set()
+
+def is_new_user(user_id):
+    return user_id not in completed_assessment_users
 
 @app.route("/api/auth/logout")
 def logout():
@@ -204,6 +235,9 @@ def company_assessment():
         company_description = form.company_description.data
         current_challenges = form.current_challenges.data
 
+        user_id = session.get("user")
+        completed_assessment_users.add(user_id)
+
         print(f"Company Name: {company_name}")
         print(f"Implemented Products: {implemented_products}")
         print(f"Industry: {industry}")
@@ -215,6 +249,36 @@ def company_assessment():
 
         flash('Company information submitted successfully!', 'success')
 
-        return redirect(url_for("company_assessment"))
+        return redirect(url_for("dashboard"))
 
     return render_template("company_assessment.html", form=form)
+
+@app.route("/swipe")
+def swipe_page():
+    # user_id = session.get("user")
+    return render_template("swipe. html")
+
+@app.route("/dashboard")
+def dashboard():
+    # Retrieve the user ID from the session
+    user_id = session.get("user")
+
+    if not user_id:
+        return redirect(url_for("index"))
+
+    # Here, use the `user_id` or any other way to retrieve the assessment data
+    # For now, we will assume you want to pass the data collected in `company_assessment`
+    # Modify the data as needed to pass to the template
+    company_data = {
+        "company_name": session.get("company_name"),
+        "implemented_products": session.get("implemented_products"),
+        "industry": session.get("industry"),
+        "program_start_date": session.get("program_start_date"),
+        "company_size": session.get("company_size"),
+        "location": session.get("location"),
+        "company_description": session.get("company_description"),
+        "current_challenges": session.get("current_challenges"),
+    }
+
+    return render_template("dashboard.html", **company_data)
+
