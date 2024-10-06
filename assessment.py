@@ -1,3 +1,4 @@
+from datetime import date
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, SelectField, DateField, IntegerField, SubmitField, SelectMultipleField
 from wtforms.validators import DataRequired, Optional, NumberRange
@@ -11,11 +12,20 @@ def get_product_choices():
     except FileNotFoundError:
         return []
 
-print(get_product_choices())
+
+from datetime import date
+from flask_wtf import FlaskForm
+from wtforms import StringField, TextAreaField, SelectField, DateField, IntegerField, SubmitField, SelectMultipleField
+from wtforms.validators import DataRequired, Optional, NumberRange
+
 
 class CompanyForm(FlaskForm):
     company_name = StringField('Company Name', validators=[DataRequired()])
-    implemented_products = SelectMultipleField('Implemented Products', choices = get_product_choices(), validators=[Optional()])
+
+    implemented_products = SelectMultipleField('Implemented Products', choices=get_product_choices(),
+                                               validators=[Optional()])
+    unimplemented_products = SelectMultipleField('Unimplemented Products', choices=get_product_choices(),
+                                                 validators=[Optional()])
 
     industry = SelectField(
         'Industry',
@@ -35,14 +45,24 @@ class CompanyForm(FlaskForm):
             ('entertainment', 'Entertainment'),
             ('government', 'Government'),
             ('non_profit', 'Non-Profit'),
-            ('other', 'Other')
+            ('other', 'Other')  # Option to add custom industry
         ],
         validators=[DataRequired()]
     )
 
-    program_start_date = DateField('Program Start Date (YYYY-MM-DD)', format='%Y-%m-%d', validators=[Optional()])
-    company_size = IntegerField('Company Size (Number of Employees)', validators=[Optional(), NumberRange(min=0, message="Company size must be a non-negative integer.")])
+    custom_industry = StringField('Custom Industry', validators=[Optional()])
+
+    # Default Program Start Date to today
+    program_start_date = DateField('Program Start Date (YYYY-MM-DD)', format='%Y-%m-%d', default=date.today,
+                                   validators=[Optional()])
+
+    # Default Company Size to 1
+    company_size = IntegerField('Company Size (Number of Employees)', default=1, validators=[Optional(),
+                                                                                             NumberRange(min=0,
+                                                                                                         message="Company size must be a non-negative integer.")])
+
     location = StringField('Location', validators=[Optional()])
     company_description = TextAreaField('Company Description', validators=[Optional()])
-    current_challenges = TextAreaField('Current Challenges', validators=[DataRequired()])
+    current_challenges = TextAreaField('Current Challenges', validators=[Optional()])
     submit = SubmitField('Submit')
+

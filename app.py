@@ -20,7 +20,7 @@ from assessment import CompanyForm
 app = Flask(__name__)
 app.config.from_object("config")
 Session(app)
-
+app.secret_key = '5fd22f708895fd5e1b05a04b8d21e7377db75a2bf3176cfd758c9189ed315165'
 # In-memory storage for users and clients
 in_memory_users = {}
 user_clients = {}
@@ -91,25 +91,41 @@ def login_required(f):
     return decorated_function
 
 
-# Route to fetch cards from the external API
+# Route to fetch cards from the external API using user session data
 @app.route("/api/get_cards", methods=["POST", "GET"])
 @login_required
 def get_cards():
     # Define the URL for the external API (localhost:8000)
     external_api_url = "http://localhost:8000/recommend/get_recommendations"
 
-    # Example data to send in the POST request
+    # Get user's data from the session
+    company_name = session.get('company_name', 'Unknown Company')
+    implemented_products = session.get('implemented_products', [])
+    unimplemented_products = session.get('unimplemented_products', [])
+    industry = session.get('industry', 'Unknown Industry')
+    custom_industry = session.get('custom_industry', None)
+    program_start_date = session.get('program_start_date', date.today().strftime('%Y-%m-%d'))
+    company_size = session.get('company_size', 1)
+    location = session.get('location', 'Unknown Location')
+    company_description = session.get('company_description', '')
+    current_challenges = session.get('current_challenges', [])
+
+    # If custom industry is specified, use that instead of the selected industry
+    if custom_industry:
+        industry = custom_industry
+
+    # Example data to send in the POST request using session data
     payload = {
-        "company_name": "AlphaArt",
-        "implemented_products": ["Alteryx", "BetaRix"],
-        "implemented_products_is_implemented": [False, False],
-        "industry": "Art Subscription Box",
-        "program_start_date": "2022-05-09",
-        "company_size": 50,
-        "location": "New York, USA",
-        "Optional Company Description": "Hey, this is what we do and how we do it.",
-        "current_challenges": ["Data analytics automation", "Customer engagement"],
-        "number_of_recommendations": 40
+        "company_name": company_name,
+        "implemented_products": implemented_products+unimplemented_products,
+        "implemented_products_is_implemented": [True] * len(implemented_products) + [False] * len(unimplemented_products),
+        "industry": industry,
+        "program_start_date": program_start_date,
+        "company_size": company_size,
+        "location": location,
+        "Optional Company Description": company_description,
+        "current_challenges": current_challenges,
+        "number_of_recommendations": 5
     }
 
     try:
@@ -135,7 +151,8 @@ def get_cards():
                     "id": str(i + 1),
                     "title": rec["accelerator"],
                     "imageUrl": image_url,
-                    "description": rec["description"]
+                    "description": rec["description"],
+                    "type":rec["accelerator"].split(" ")[0],
                 })
 
             return jsonify({"cards": cards})
@@ -147,6 +164,7 @@ def get_cards():
         # Catch any exceptions during the request
         print(f"Error fetching cards: {e}")
         return jsonify({"error": "An error occurred while fetching cards."}), 500
+
 
 # Route to handle swipe actions
 @app.route("/api/swipe", methods=["POST"])
@@ -224,7 +242,16 @@ def logout():
 @app.route("/quiz")
 @login_required
 def quiz():
-    return render_template("swipe_quiz.html", user=in_memory_users.get(session.get("user")))
+    if not session.get("user"):
+        return redirect(url_for("login"))
+
+    else:
+        kinde_client = user_clients.get(session.get("user"))
+        if kinde_client and kinde_client.is_authenticated():
+            data = {"current_year": date.today().year}
+            data.update(get_authorized_data(kinde_client))
+            return render_template("swipe_quiz.html", user=in_memory_users.get(session.get("user")))
+    return render_template("logged_out.html")
 
 
 @app.route("/loading")
@@ -242,33 +269,33 @@ def decisions():
 def results():
     return render_template("gallery.html", user=in_memory_users.get(session.get("user")))
 
+
+
 @app.route("/company_assessment", methods=["GET", "POST"])
 def company_assessment():
     form = CompanyForm()
-    if not session.get("user"):
-        return redirect(url_for('index'))
 
-    if form.validate_on_submit():
-        company_data = {
-            "company_name": form.company_name.data,
-            "implemented_products": form.implemented_products.data,
-            "industry": form.industry.data,
-            "program_start_date": form.program_start_date.data,
-            "company_size": form.company_size.data,
-            "location": form.location.data,
-            "company_description": form.company_description.data,
-            "current_challenges": form.current_challenges.data,
-        }
+    if request.method == "POST" and form.validate_on_submit():
+        # Store form data in session
+        session['company_name'] = form.company_name.data
+        session['implemented_products'] = form.implemented_products.data
+        session['unimplemented_products'] = form.unimplemented_products.data
+        session['industry'] = form.industry.data
+        session['custom_industry'] = form.custom_industry.data if form.industry.data == 'other' else None
+        session['program_start_date'] = form.program_start_date.data.strftime('%Y-%m-%d')
+        session['company_size'] = form.company_size.data
+        session['location'] = form.location.data
+        session['company_description'] = form.company_description.data
+        session['current_challenges'] = form.current_challenges.data
 
-        user_id = session.get("user")
-        in_memory_users[user_id].update(company_data)
-        completed_assessment_users.add(user_id)
+        # Flash success message
+        flash('Company assessment submitted successfully!', 'success')
 
-        flash('Company information submitted successfully!', 'success')
+        # Redirect to the quiz page
+        return redirect(url_for('quiz'))
 
-        return redirect(url_for("dashboard"))
+    return render_template("company_assessment.html", form=form)
 
-    return render_template("company_assessment.html", form=form, user=in_memory_users.get(session.get("user")))
 
 @app.route("/dashboard")
 @login_required

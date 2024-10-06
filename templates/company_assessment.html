@@ -13,15 +13,6 @@
     <!-- CSS Links -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="{{ url_for('static', filename='quartz.css') }}" rel="stylesheet">  <!-- Assuming quartz.css is saved locally -->
-    <style>
-        /* Style adjustments for the "Selected Implemented Products" title */
-        #selected-products-title {
-            font-size: 1.25rem;  /* Smaller font size */
-            margin-top: 1.5rem;  /* Space above the title */
-            margin-bottom: 1rem; /* Space below the title */
-        }
-    </style>
 </head>
 <body>
     <!-- Header Section -->
@@ -42,65 +33,69 @@
         <form method="POST" class="needs-validation" novalidate>
             {{ form.hidden_tag() }}
 
+            <!-- Company Name (Mandatory) -->
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label for="company_name" class="form-label">{{ form.company_name.label }}</label>
-                    {{ form.company_name(class="form-control", id="company_name", required="required") }}
+                    <label for="company_name" class="form-label">{{ form.company_name.label }} <span class="text-danger">*</span></label>
+                    {{ form.company_name(class="form-control", id="company_name", required="required", placeholder="Enter Company Name") }}
+                    <div class="invalid-feedback">Company name is required.</div>
                 </div>
 
+                <!-- Industry (Mandatory) -->
+                <div class="col-md-6">
+                    <label for="industry" class="form-label">{{ form.industry.label }} <span class="text-danger">*</span></label>
+                    {{ form.industry(class="form-control", id="industry", required="required", onchange="toggleCustomIndustry()") }}
+                    <div class="invalid-feedback">Industry is required.</div>
+                </div>
+
+                <!-- Custom Industry Input (hidden until "Other" is selected) -->
+                <div class="col-md-6" id="custom_industry_container" style="display: none;">
+                    <label for="custom_industry" class="form-label">{{ form.custom_industry.label }}</label>
+                    {{ form.custom_industry(class="form-control", id="custom_industry", placeholder="Enter custom industry") }}
+                </div>
+
+                <!-- Implemented Products -->
                 <div class="col-md-6">
                     <label for="implemented_products" class="form-label">{{ form.implemented_products.label }}</label>
-                    {{ form.implemented_products(class="form-control", id="implemented_products", onchange="addProductToList()", required="required") }}
+                    {{ form.implemented_products(class="form-control", id="implemented_products", onchange="addProductToList('implemented')") }}
+                    <div id="implemented-product-list" class="mt-2"></div>
                 </div>
 
-                <!-- Selected Implemented Products Section -->
-                <div class="col-12 mt-3">
-                    <h3 id="selected-products-title">Selected Implemented Products:</h3>
-                    <div id="selected-products">
-                        <ul class="list-group" id="product-list">
-                            <!-- JavaScript will dynamically add list items here -->
-                            {% if form.implemented_products.data %}
-                                {% for product in form.implemented_products.data %}
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        {{ product }}
-                                        <button class="btn btn-danger btn-sm" onclick="removeProduct(this)">Remove</button>
-                                    </li>
-                                {% endfor %}
-                            {% else %}
-                                <p id="no-products-message">No products selected.</p>
-                            {% endif %}
-                        </ul>
-                    </div>
-                </div>
-
+                <!-- Unimplemented Products -->
                 <div class="col-md-6">
-                    <label for="industry" class="form-label">{{ form.industry.label }}</label>
-                    {{ form.industry(class="form-control", id="industry", required="required") }}
+                    <label for="unimplemented_products" class="form-label">{{ form.unimplemented_products.label }}</label>
+                    {{ form.unimplemented_products(class="form-control", id="unimplemented_products", onchange="addProductToList('unimplemented')") }}
+                    <div id="unimplemented-product-list" class="mt-2"></div>
                 </div>
 
+                <!-- Program Start Date -->
                 <div class="col-md-6">
                     <label for="program_start_date" class="form-label">{{ form.program_start_date.label }}</label>
-                    {{ form.program_start_date(class="form-control", id="program_start_date", required="required") }}
+                    {{ form.program_start_date(class="form-control", id="program_start_date", value=form.program_start_date.data or date.today().strftime('%Y-%m-%d')) }}
                 </div>
 
+                <!-- Company Size -->
                 <div class="col-md-6">
                     <label for="company_size" class="form-label">{{ form.company_size.label }}</label>
-                    {{ form.company_size(class="form-control", id="company_size", required="required") }}
+                    {{ form.company_size(class="form-control", id="company_size", value=form.company_size.data or 1, placeholder="Enter number of employees") }}
                 </div>
 
+                <!-- Location -->
                 <div class="col-md-6">
                     <label for="location" class="form-label">{{ form.location.label }}</label>
-                    {{ form.location(class="form-control", id="location", required="required") }}
+                    {{ form.location(class="form-control", id="location", placeholder="Enter location") }}
                 </div>
 
+                <!-- Company Description -->
                 <div class="col-12">
                     <label for="company_description" class="form-label">{{ form.company_description.label }}</label>
-                    {{ form.company_description(class="form-control", id="company_description", rows=4, required="required") }}
+                    {{ form.company_description(class="form-control", id="company_description", rows=4, placeholder="Describe your company") }}
                 </div>
 
+                <!-- Current Challenges -->
                 <div class="col-12">
                     <label for="current_challenges" class="form-label">{{ form.current_challenges.label }}</label>
-                    {{ form.current_challenges(class="form-control", id="current_challenges", rows=4, required="required") }}
+                    {{ form.current_challenges(class="form-control", id="current_challenges", rows=4, placeholder="List your current challenges") }}
                 </div>
             </div>
 
@@ -124,78 +119,47 @@
 
     <!-- Bootstrap JS and dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+
+    <!-- JavaScript to handle dynamic product selection and custom industry input -->
     <script>
-        // Activate Feather icons
-        feather.replace();
-
-        // Add selected product to the list
-        function addProductToList() {
-            var productSelect = document.getElementById('implemented_products');
-            var selectedProduct = productSelect.options[productSelect.selectedIndex].text;
-
-            // Check if product is already added
-            if (document.getElementById(selectedProduct)) {
-                alert('Product already added.');
-                return;
+        // Toggle the custom industry input when "Other" is selected
+        function toggleCustomIndustry() {
+            var industrySelect = document.getElementById('industry');
+            var customIndustryContainer = document.getElementById('custom_industry_container');
+            if (industrySelect.value === 'other') {
+                customIndustryContainer.style.display = 'block';
+            } else {
+                customIndustryContainer.style.display = 'none';
             }
+        }
 
-            var listItem = document.createElement('li');
-            listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
-            listItem.textContent = selectedProduct;
-            listItem.id = selectedProduct;
+        // Function to add products to the list (Implemented or Unimplemented)
+        function addProductToList(type) {
+            var selectElement = document.getElementById(type + '_products');
+            var selectedOption = selectElement.options[selectElement.selectedIndex].text;
+            var productList = document.getElementById(type + '-product-list');
 
-            // Create delete button
-            var deleteButton = document.createElement('button');
-            deleteButton.className = 'btn btn-danger btn-sm';
-            deleteButton.textContent = 'Remove';
-            deleteButton.onclick = function () {
-                document.getElementById('product-list').removeChild(listItem);
-                checkProductList();  // Update message when item is removed
+            // Create a new tag element for the product
+            var tag = document.createElement('div');
+            tag.classList.add('badge', 'bg-secondary', 'text-white', 'm-1', 'p-2', 'd-inline-flex', 'align-items-center');
+            tag.innerText = selectedOption;
+
+            // Add a remove button to the tag
+            var removeButton = document.createElement('button');
+            removeButton.type = 'button';
+            removeButton.classList.add('btn-close', 'btn-close-white', 'ms-2');
+            removeButton.onclick = function () {
+                tag.remove();
             };
 
-            listItem.appendChild(deleteButton);
-            document.getElementById('product-list').appendChild(listItem);
-
-            // Hide 'No products selected' message
-            document.getElementById('no-products-message').style.display = 'none';
+            tag.appendChild(removeButton);
+            productList.appendChild(tag);
         }
 
-        // Remove selected product from the list
-        function removeProduct(element) {
-            var productList = document.getElementById('product-list');
-            productList.removeChild(element.parentElement);
-            checkProductList();  // Update message when item is removed
+        // Initialize the custom industry field visibility
+        window.onload = function () {
+            toggleCustomIndustry();
         }
-
-        // Check if the product list is empty and display the message accordingly
-        function checkProductList() {
-            var productList = document.getElementById('product-list');
-            var noProductsMessage = document.getElementById('no-products-message');
-
-            if (productList.children.length === 0) {
-                noProductsMessage.style.display = 'block';
-            }
-            else {
-                noProductsMessage.style.display = 'none';
-            }
-        }
-
-        // Google Maps API initialization for autocomplete
-        function initAutocomplete() {
-            var locationInput = document.getElementById('location');
-            var autocomplete = new google.maps.places.Autocomplete(locationInput, {
-                types: ['(cities)']  // Restrict suggestions to cities
-            });
-
-            autocomplete.addListener('place_changed', function () {
-                var place = autocomplete.getPlace();
-                console.log("Selected Place: ", place);
-            });
-        }
-        window.onload = initAutocomplete;
     </script>
 </body>
 </html>
-
-

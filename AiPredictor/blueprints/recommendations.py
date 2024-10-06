@@ -232,8 +232,8 @@ def get_recommendations():
     if 'number_of_recommendations' in data:
         if not isinstance(number_of_recommendations, int):
             return jsonify({'error': "'number_of_recommendations' must be an integer."}), 400
-        if not (1 <= number_of_recommendations <= 20):
-            return jsonify({'error': "'number_of_recommendations' must be between 1 and 20."}), 400
+        if not (1 <= number_of_recommendations <= 30):
+            return jsonify({'error': "'number_of_recommendations' must be between 1 and 30."}), 400
 
     # Create context tokens
     context_tokens = []
