@@ -1,1 +1,49 @@
+/* Gradient background for the loading screen */
+.loading-screen {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  background: linear-gradient(to right, #e91e63, #fad0c4, #b3e5fc, #90caf9);
+  background-size: 400% 400%;
+  animation: gradientAnimation 15s ease infinite;
+}
 
+@keyframes gradientAnimation {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Styling for the "Here Are Your Potential Candidates" text */
+.loading-text {
+  font-size: 36px;
+  font-weight: bold;
+  color: #f50057;
+  border: 2px solid #f50057;
+  text-align: center;
+  background-color: #FFFFFF;
+  padding: 20px;
+  border-radius: 25px;
+}
+
+/* Styling for the swipe instructions */
+.swipe-instructions {
+  margin-top: 20px;
+  font-size: 20px;
+  color: #f50057;
+  background-color: #FFFFFF;
+  font-weight: bold;
+  text-align: center;
+  border: 2px solid #f50057;
+  padding: 15px;
+  border-radius: 10px;
+}
