@@ -1,7 +1,7 @@
 # app.py
 
 from flask import Flask
-from config import Config
+from AiPredictor.config import Config
 from blueprints.routes import database_bp
 from blueprints.recommendations import recommendations_bp  # Import the new blueprint
 
