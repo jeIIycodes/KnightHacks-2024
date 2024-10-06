@@ -1,233 +1,369 @@
-# Import necessary libraries
+# tests.py
+
+import random
+import itertools
 import pandas as pd
 import numpy as np
-
-# For collaborative filtering
-from surprise import Dataset, Reader, SVD, KNNBasic
-from surprise.model_selection import cross_validate, train_test_split
-
-# For content-based filtering
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-
-# For evaluation
-from sklearn.metrics import precision_score, recall_score
-
-# For splitting data
+import warnings
 from sklearn.model_selection import KFold
+import concurrent.futures
+from models import MostCommonModel, NGramModel
 
-# Load the data
-# Assuming the TSV files are in the current directory
-accelerators_df = pd.read_csv('data/accelerators.tsv', sep='\t', header=0)
-companies_df = pd.read_csv('data/companies.tsv', sep='\t', header=0)
-entitlements_df = pd.read_csv('data/entitlements.tsv', sep='\t', header=0)
-products_df = pd.read_csv('data/products.tsv', sep='\t', header=0)
+# Suppress warnings
+warnings.filterwarnings('ignore')
 
-# Display the head of each dataframe to check their structure
-print("Accelerators DataFrame:")
-print(accelerators_df.head(1))
-print("\nCompanies DataFrame:")
-print(companies_df.head())
-print("\nEntitlements DataFrame:")
-print(entitlements_df.head())
-print("\nProducts DataFrame:")
-print(products_df.head())
+def load_data():
+    """
+    Load and preprocess the datasets. Returns the preprocessed data needed for the models.
 
-# Preprocessing and Data Integration
-# Merge entitlements with companies to get company details
-company_entitlements_df = entitlements_df.merge(companies_df, left_on='Company', right_on='Name', how='left')
+    Returns:
+        companies_df: DataFrame of companies.
+        company_products: Mapping from companies to products and implementation status.
+        company_accelerators: Mapping from companies to accelerators.
+    """
+    # Load the data
+    accelerators_df = pd.read_csv('data/accelerators.tsv', sep='\t', header=0)
+    companies_df = pd.read_csv('data/companies.tsv', sep='\t', header=0)
+    entitlements_df = pd.read_csv('data/company_entitlements.tsv', sep='\t', header=0)
+    products_df = pd.read_csv('data/products.tsv', sep='\t', header=0)
 
-# Merge accelerators with products to get product details
-accelerators_products_df = accelerators_df.merge(products_df, left_on='Product', right_on='Name', how='left')
+    # Merge products with entitlements to get product details including Category
+    entitlements_df = entitlements_df.merge(
+        products_df[['Name', 'Category']],
+        left_on='Product',
+        right_on='Name',
+        how='left',
+        suffixes=('', '_Product')
+    )
 
+    # Merge entitlements with companies to get company name and industry
+    entitlements_df = entitlements_df.merge(
+        companies_df[['Name', 'Industry']],
+        left_on='Company',
+        right_on='Name',
+        how='left',
+        suffixes=('', '_Company')
+    )
 
-# Create a user-item interaction matrix for collaborative filtering
-# For simplicity, we will assume that if a company has 'Implemented' a product, they have interacted with the 'TuneUp' accelerator
-# If not, they have interacted with the 'Jumpstart' accelerator
+    # Create a mapping from Company to their products, implementation status, and categories as separate tokens
+    company_products = entitlements_df.groupby('Company').apply(
+        lambda x: [
+            ['Product_' + row['Product'], 'implemented' if row['Implemented'] else 'not_implemented', 'Category_' + row['Category']]
+            for idx, row in x.iterrows()
+        ]
+    ).to_dict()
 
-# Create a function to assign accelerators based on implementation status
-def assign_accelerator(row):
-    if row['Implemented']:
-        return accelerators_df[(accelerators_df['Product'] == row['Product']) & (accelerators_df['Type'] == 'TuneUp')][
-            'Name'].values
+    # Create a mapping from Company to their accelerators
+    company_accelerators = entitlements_df.groupby('Company')['Accelerator'].apply(
+        lambda accelerators: ['Accelerator_' + acc for acc in accelerators]
+    ).to_dict()
+
+    return companies_df, company_products, company_accelerators,accelerators_df
+
+def generate_permutations_poisson(industry_token, paired_list, num_permutations=None, lambda_poisson=1.0):
+    """
+    Generate permutations of product tokens and their associated accelerators, keeping the order within pairs.
+
+    Args:
+        industry_token (str): The industry token.
+        paired_list (list): List of tuples, each containing product tokens list and accelerator.
+        num_permutations (int): Number of permutations to generate.
+        lambda_poisson (float): Lambda parameter for Poisson distribution.
+
+    Returns:
+        permutations (list): List of permuted sequences.
+    """
+    total_pairs = len(paired_list)
+    permutations = []
+
+    if num_permutations is None:
+        pair_permutations = list(itertools.permutations(paired_list))
+        for pair_perm in pair_permutations:
+            new_sequence = [industry_token]
+            for product_tokens, accelerator in pair_perm:
+                new_sequence.extend(product_tokens)
+                new_sequence.append('Accelerator_' + accelerator)
+            permutations.append(new_sequence)
     else:
-        return \
-        accelerators_df[(accelerators_df['Product'] == row['Product']) & (accelerators_df['Type'] == 'Jumpstart')][
-            'Name'].values
+        for _ in range(num_permutations):
+            num_pairs_included = np.random.poisson(lambda_poisson)
+            num_pairs_included = max(1, min(num_pairs_included, total_pairs))
+
+            selected_pairs = random.sample(paired_list, num_pairs_included)
+            random.shuffle(selected_pairs)
+            new_sequence = [industry_token]
+            new_sequence_back=[]
+            for product_tokens, accelerator in selected_pairs:
+                new_sequence.extend(product_tokens)
+                new_sequence_back.append('Accelerator_' + accelerator)
+            new_sequence.extend(new_sequence_back)
+            permutations.append(new_sequence)
+
+    return permutations
+
+def calculate_metrics(actual_accelerators, recommended_accelerators):
+    num_correct = len(
+        set(recommended_accelerators) & set(actual_accelerators))  # Intersection of actual and recommended
+
+    precision = num_correct / len(recommended_accelerators) if recommended_accelerators else 0
+    recall = num_correct / len(actual_accelerators) if actual_accelerators else 0
+    f1 = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+    # Accuracy: number of correct recommendations over the number of recommended accelerators
+    accuracy = num_correct / len(recommended_accelerators) if recommended_accelerators else 0
+
+    return precision, recall, f1, accuracy
+
+def process_fold(fold, train_index, test_index, all_companies, companies_df, company_products, company_accelerators,n, k, num_permutations):
+    print(f"Processing Fold {fold}...")
+
+    # Get train and test company names
+    train_companies = [all_companies[i] for i in train_index]
+    test_companies = [all_companies[i] for i in test_index]
+
+    # Generate training sequences with permutations
+    train_sequences = []
+    for company in train_companies:
+        # Get industry
+        industry = companies_df.loc[companies_df['Name'] == company, 'Industry'].values[0]
+        industry_token = 'Industry_' + industry
+
+        # Get products tokens and accelerators
+        products_impl_list = company_products.get(company, [])  # List of lists of tokens
+        accelerators = company_accelerators.get(company, [])  # List of accelerators with 'Accelerator_' prefix
+
+        # Ensure the number of products matches the number of accelerators
+        if len(products_impl_list) != len(accelerators):
+            print(f"Skipping company '{company}' due to mismatched products and accelerators.")
+            continue
+
+        # Build paired_list
+        paired_list = list(zip(products_impl_list, [acc.replace('Accelerator_', '') for acc in accelerators]))
+
+        # Generate permutations
+        permutations = generate_permutations_poisson(industry_token, paired_list, num_permutations=num_permutations, lambda_poisson=1.0)
+
+        train_sequences.extend(permutations)
+
+    # Generate test sequences without permutations (use original sequences)
+    test_sequences = []
+    for company in test_companies:
+        # Get industry
+        industry = companies_df.loc[companies_df['Name'] == company, 'Industry'].values[0]
+        industry_token = 'Industry_' + industry
+
+        # Get products tokens and accelerators
+        products_impl_list = company_products.get(company, [])
+        accelerators = company_accelerators.get(company, [])
+
+        # Ensure the number of products matches the number of accelerators
+        if len(products_impl_list) != len(accelerators):
+            print(f"Skipping company '{company}' due to mismatched products and accelerators.")
+            continue
+
+        # Build sequence
+        sequence = [industry_token]
+        for product_tokens, accelerator in zip(products_impl_list, accelerators):
+            sequence.extend(product_tokens)
+            sequence.append(accelerator)
+        test_sequences.append(sequence)
+
+    # Train the Most Common Accelerator Model
+    train_accelerators = []
+    for seq in train_sequences:
+        train_accelerators.extend([token.replace('Accelerator_', '') for token in seq if token.startswith('Accelerator_')])
+
+    most_common_model = MostCommonModel()
+    most_common_model.train(train_accelerators)
+
+    # Evaluate the Most Common Model
+    precisions_mc = []
+    recalls_mc = []
+    f1s_mc = []
+    accuracies_mc = []
+    for seq in test_sequences:
+        actual_accelerators = [token.replace('Accelerator_', '') for token in seq if token.startswith('Accelerator_')]
+        recommendations = most_common_model.recommend(top_n=5)
+        precision, recall, f1, accuracy = calculate_metrics(actual_accelerators, recommendations)
+        precisions_mc.append(precision)
+        recalls_mc.append(recall)
+        f1s_mc.append(f1)
+        accuracies_mc.append(accuracy)
+
+    metrics_mc = {
+        'Precision': np.mean(precisions_mc),
+        'Recall': np.mean(recalls_mc),
+        'F1 Score': np.mean(f1s_mc),
+        'Accuracy': np.mean(accuracies_mc)
+    }
 
 
-company_entitlements_df['Accelerators'] = company_entitlements_df.apply(assign_accelerator, axis=1)
 
-# Explode the accelerators column to have one accelerator per row
-company_entitlements_df = company_entitlements_df.explode('Accelerators')
+    # Train the N-Gram Model
+    ngram_model = NGramModel(n=n, k=k,)
+    ngram_model.train(train_sequences)
 
-# Prepare data for the collaborative filtering model
-# Create a DataFrame with columns: 'Company', 'Accelerator', 'Interaction'
-# For simplicity, we can set Interaction = 1 (since we don't have explicit ratings)
-interaction_df = company_entitlements_df[['Company', 'Accelerators']].copy()
-interaction_df['Interaction'] = 1
+    # Evaluate the N-Gram Model
+    precisions_ng = []
+    recalls_ng = []
+    f1s_ng = []
+    accuracies_ng = []
+    for seq in test_sequences:
+        # Separate context tokens and actual accelerators
+        context_tokens = []
+        actual_accelerators = []
+        i = 0
+        while i < len(seq):
+            token = seq[i]
+            if token.startswith('Industry_'):
+                context_tokens.append(token)
+                i += 1
+            elif token.startswith('Product_'):
+                # Product tokens: Product, implementation status, category
+                context_tokens.extend(seq[i:i+3])
+                i += 3
+            elif token.startswith('Accelerator_'):
+                actual_accelerators.append(token.replace('Accelerator_', ''))
+                i += 1
+            else:
+                i += 1  # Skip unexpected tokens
 
-# Remove duplicates
-interaction_df.drop_duplicates(inplace=True)
+        recommendations = ngram_model.recommend(context_tokens, top_n=5)
+        precision, recall, f1, accuracy = calculate_metrics(actual_accelerators, recommendations)
+        precisions_ng.append(precision)
+        recalls_ng.append(recall)
+        f1s_ng.append(f1)
+        accuracies_ng.append(accuracy)
 
-print("\nInteraction DataFrame:")
-print(interaction_df.head())
+    metrics_ngram_fold = {
+        'Precision': np.mean(precisions_ng),
+        'Recall': np.mean(recalls_ng),
+        'F1 Score': np.mean(f1s_ng),
+        'Accuracy': np.mean(accuracies_ng)
+    }
 
-# Collaborative Filtering using Surprise Library
-# Prepare the data in the format required by Surprise
-reader = Reader(rating_scale=(0, 1))
-data = Dataset.load_from_df(interaction_df[['Company', 'Accelerators', 'Interaction']], reader)
+    print(f"Fold {fold} Metrics:")
+    print("Most Common Model:", metrics_mc)
+    print("N-Gram Model:", metrics_ngram_fold)
+    print("-" * 50)
 
+    return {
+        'Fold': fold,
+        'MostCommonMetrics': metrics_mc,
+        'NGramMetrics': metrics_ngram_fold
+    }
 
-# Define a function to evaluate different collaborative filtering algorithms
-def evaluate_collaborative_filtering(algo, data):
-    # Perform cross-validation
-    print(f"\nEvaluating {algo.__class__.__name__}...")
-    cross_validate(algo, data, measures=['rmse', 'mse','mae'], cv=5, verbose=True)
+def compute_mean_metrics(metrics_list):
+    mean_metrics = {}
+    for metric in metrics_list[0].keys():
+        mean_metrics[metric] = np.mean([m[metric] for m in metrics_list])
+    return mean_metrics
 
+def run_parallel_folds(kf, company_indices, all_companies, companies_df, company_products, company_accelerators,n, k, num_permutations):
+    metrics_most_common = []
+    metrics_ngram = []
 
-# Evaluate SVD algorithm
-svd_algo = SVD()
-evaluate_collaborative_filtering(svd_algo, data)
+    # Use ProcessPoolExecutor to parallelize the fold processing
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        futures = []
+        for fold, (train_index, test_index) in enumerate(kf.split(company_indices), 1):
+            futures.append(executor.submit(
+                process_fold,
+                fold, train_index, test_index, all_companies, companies_df, company_products, company_accelerators,n, k, num_permutations
+            ))
 
-# Evaluate KNNBasic algorithm
-knn_algo = KNNBasic()
-evaluate_collaborative_filtering(knn_algo, data)
+        for future in concurrent.futures.as_completed(futures):
+            result = future.result()
+            metrics_most_common.append(result['MostCommonMetrics'])
+            metrics_ngram.append(result['NGramMetrics'])
 
-# Content-Based Filtering
-# Use the descriptions from accelerators and products to create feature vectors
-# Combine product and accelerator descriptions
-accelerators_products_df['Combined_Description'] = accelerators_products_df['Type'] + ' ' + \
-                                                   accelerators_products_df['Description']
+    return metrics_most_common, metrics_ngram
 
-# Create a TF-IDF Vectorizer
-tfidf_vectorizer = TfidfVectorizer(stop_words='english')
+def run_tests(n, k, num_permutations):
+    companies_df, company_products, company_accelerators,accelerators_df = load_data()
 
-# Fit and transform the combined descriptions
-tfidf_matrix = tfidf_vectorizer.fit_transform(accelerators_products_df['Combined_Description'])
+    # Prepare the list of all company names
+    all_companies = companies_df['Name'].tolist()
+    company_indices = np.arange(len(all_companies))
 
-# Compute cosine similarity between accelerators
-cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
+    # Initialize K-Fold cross-validation
+    kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
-# Map accelerators to indices
-accelerator_indices = pd.Series(accelerators_products_df.index,
-                                index=accelerators_products_df['Name_x']).drop_duplicates()
+    metrics_most_common, metrics_ngram = run_parallel_folds(
+        kf, company_indices, all_companies, companies_df, company_products, company_accelerators,n, k, num_permutations
+    )
 
+    mean_metrics_most_common = compute_mean_metrics(metrics_most_common)
+    mean_metrics_ngram = compute_mean_metrics(metrics_ngram)
 
-# Function to get recommendations based on content
-def get_content_recommendations(accelerator_name, cosine_sim=cosine_sim):
-    idx = accelerator_indices[accelerator_name]
-    sim_scores = list(enumerate(cosine_sim[idx]))
-    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-    sim_scores = sim_scores[1:4]  # Get top 3 similar accelerators
-    accelerator_indices_list = [i[0] for i in sim_scores]
-    return accelerators_products_df['Name_x'].iloc[accelerator_indices_list]
+    print("\nAggregated Most Common Accelerator Model Metrics:")
+    print(mean_metrics_most_common)
 
+    print("\nAggregated N-Gram Model Metrics:")
+    print(mean_metrics_ngram)
 
-# Example usage
-print("\nContent-Based Recommendations for 'Jumpstart Your ActiveCampaign':")
-print(get_content_recommendations('Jumpstart Your ActiveCampaign'))
+def train_and_use_ngram_model(n, k, num_permutations, sample_context):
+    """
+    Trains the N-Gram model using the entire dataset and makes recommendations on a sample context.
 
-# Hybrid Approach
-# Combine Collaborative Filtering and Content-Based Filtering
-# For demonstration, we will average the scores from both methods
+    Args:
+        n (int): N for the N-Gram model.
+        k (float): Smoothing parameter for the N-Gram model.
+        num_permutations (int): Number of permutations to generate for training sequences.
+        sample_context (list): Sample context to get recommendations for.
 
-# First, get the list of all companies and accelerators
-companies_list = interaction_df['Company'].unique()
-accelerators_list = accelerators_df['Name'].unique()
+    Returns:
+        recommendations: List of recommended accelerators.
+    """
+    companies_df, company_products, company_accelerators,accelerators_df = load_data()
+    accelerator_names_with_prefix = ["Accelerator_" + name for name in accelerators_df['Name'].tolist()]
+    all_companies = companies_df['Name'].tolist()
 
-# Build user profiles based on content
-company_profiles = {}
+    # Generate training sequences with permutations for all companies
+    train_sequences = []
+    for company in all_companies:
+        # Get industry
+        industry = companies_df.loc[companies_df['Name'] == company, 'Industry'].values[0]
+        industry_token = 'Industry_' + industry
 
-for company in companies_list:
-    # Get accelerators the company has interacted with
-    company_accelerators = interaction_df[interaction_df['Company'] == company]['Accelerators']
-    # Get the indices of these accelerators
-    indices = [accelerator_indices[acc] for acc in company_accelerators if acc in accelerator_indices]
-    # Compute the mean of their TF-IDF vectors
-    if indices:
-        company_profiles[company] = np.mean(tfidf_matrix[indices], axis=0)
-    else:
-        company_profiles[company] = np.zeros(tfidf_matrix.shape[1])
+        # Get products tokens and accelerators
+        products_impl_list = company_products.get(company, [])  # List of lists of tokens
+        accelerators = company_accelerators.get(company, [])  # List of accelerators with 'Accelerator_' prefix
 
+        # Ensure the number of products matches the number of accelerators
+        if len(products_impl_list) != len(accelerators):
+            continue
 
-# Function to recommend accelerators to a company
-def hybrid_recommendations(company, top_n=3):
-    # Get the company profile
-    company_profile = company_profiles[company]
-    if company_profile.sum() == 0:
-        # If the company has no interactions, recommend top accelerators based on popularity
-        popular_accelerators = interaction_df['Accelerators'].value_counts().index[:top_n]
-        return popular_accelerators
-    # Compute similarity between company profile and all accelerators
-    sim_scores = cosine_similarity(np.asarray(company_profile),  tfidf_matrix)
-    sim_scores = list(enumerate(sim_scores[0]))
-    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-    # Get accelerators the company hasn't interacted with
-    company_accelerators = set(interaction_df[interaction_df['Company'] == company]['Accelerators'])
-    recommendations = []
-    for idx, score in sim_scores:
-        accelerator = accelerators_products_df['Name_x'].iloc[idx]
-        if accelerator not in company_accelerators:
-            recommendations.append((accelerator, score))
-        if len(recommendations) == top_n:
-            break
+        # Build paired_list
+        paired_list = list(zip(products_impl_list, [acc.replace('Accelerator_', '') for acc in accelerators]))
+
+        # Generate permutations
+        permutations = generate_permutations_poisson(industry_token, paired_list, num_permutations=num_permutations, lambda_poisson=1.0)
+
+        train_sequences.extend(permutations)
+
+    # Train the N-Gram model
+    ngram_model = NGramModel(n=n, k=k,base_tokens=accelerator_names_with_prefix)
+    ngram_model.train(train_sequences)
+
+    # Make recommendations for the sample context
+    recommendations = ngram_model.recommend(sample_context, top_n=5)
+
     return recommendations
 
+if __name__ == '__main__':
+    # Run tests
+    #run_tests(n=3, k=0.5, num_permutations=10)
 
-# Example usage
-print("\nHybrid Recommendations for 'AlphaArt':")
-print(hybrid_recommendations('AlphaArt'))
+    # Sample context tokens
+    sample_context = ['Industry_Sports Equipment',
+                      'Product_Tibco Spotfire',
+                      'not_implemented',
+                      'Category_Business Intelligence and Analytics']
 
-# Evaluation of the Hybrid Model
-# We can perform leave-one-out cross-validation
+    # Train N-Gram model and get recommendations
+    recommendations = train_and_use_ngram_model(n=3, k=0.5, num_permutations=10, sample_context=sample_context)
 
-# Add a unique identifier for each interaction
-interaction_df['Interaction_ID'] = range(len(interaction_df))
-
-# Prepare the evaluation
-kf = KFold(n_splits=5, shuffle=True, random_state=42)
-
-precision_list = []
-recall_list = []
-
-for train_index, test_index in kf.split(interaction_df):
-    # Split the data
-    train_df = interaction_df.iloc[train_index]
-    test_df = interaction_df.iloc[test_index]
-
-    # Build company profiles using train data
-    companies_list = train_df['Company'].unique()
-    company_profiles = {}
-    for company in companies_list:
-        company_accelerators = train_df[train_df['Company'] == company]['Accelerators']
-        indices = [accelerator_indices[acc] for acc in company_accelerators if acc in accelerator_indices]
-        if indices:
-            company_profiles[company] = np.mean(tfidf_matrix[indices], axis=0)
-        else:
-            company_profiles[company] = np.zeros(tfidf_matrix.shape[1])
-
-    # Test the model
-    y_true = []
-    y_pred = []
-    for idx, row in test_df.iterrows():
-        company = row['Company']
-        actual_accelerator = row['Accelerators']
-        # Get recommendations
-        recommendations = hybrid_recommendations(company, top_n=3)
-        recommended_accelerators = [rec[0] for rec in recommendations]
-        # Record the true and predicted values
-        y_true.append(1)
-        if actual_accelerator in recommended_accelerators:
-            y_pred.append(1)
-        else:
-            y_pred.append(0)
-
-    # Calculate precision and recall
-    precision = precision_score(y_true, y_pred)
-    recall = recall_score(y_true, y_pred)
-    precision_list.append(precision)
-    recall_list.append(recall)
-
-print(f"\nHybrid Model Precision: {np.mean(precision_list)}")
-print(f"Hybrid Model Recall: {np.mean(recall_list)}")
+    # Print the recommendations
+    print("\nSample Recommendations from N-Gram Model:")
+    print(recommendations)
