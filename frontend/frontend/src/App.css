@@ -1,9 +1,9 @@
 /* App.css */
 .App {
-  height: 100vh;
+  min-height: 100vh; /* Change height to min-height */
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start; /* Align to the top so content can scroll */
   position: relative;
   background: linear-gradient(to right, #e91e63, #fad0c4, #b3e5fc, #90caf9);
   background-size: 400% 400%;
@@ -91,4 +91,27 @@
   border-radius: 10px;
   cursor: pointer;
   margin-top: 20px;
+}
+
+.navigation-buttons {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 20px;
+  position: absolute;
+  bottom: 20px;
+}
+
+.back-button, .next-button {
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.back-button:hover, .next-button:hover {
+  background-color: #45a049;
 }

@@ -1,0 +1,17 @@
+/* src/pages/Loading/Loading.css */
+.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #222;
+  }
+  
+  .loading h1 {
+    color: #fff;
+  }
+  
+  .loading p {
+    color: #bbb;
+  }
+  

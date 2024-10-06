@@ -1,0 +1,16 @@
+/* src/pages/Decisions/Decisions.css */
+.decisions {
+    padding: 20px;
+    background-color: #eef;
+  }
+  
+  .decisions h1 {
+    font-size: 1.8rem;
+    color: #333;
+  }
+  
+  .decisions p {
+    font-size: 1rem;
+    color: #777;
+  }
+  

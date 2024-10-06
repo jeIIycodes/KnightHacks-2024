@@ -1,47 +1,48 @@
-import React from 'react';
-import './App.css'; // Keeping the CSS import
+import React, { useState } from 'react';
+import Homepage from './Homepage/Homepage';
+import Quiz from './Quiz/Quiz';
+import Loading from './Loading/Loading';
+import Decisions from './Decision/Decision';
+import Gallery from './Gallery/Gallery';
+import './App.css';
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 function App() {
+  const [currentPage, setCurrentPage] = useState(0);
+
+  const handleNext = () => {
+    setCurrentPage(prevPage => prevPage + 1);
+  };
+
+  const handleBack = () => {
+    setCurrentPage(prevPage => prevPage - 1);
+  };
+
+  const pages = [
+    <Homepage onNext={handleNext} />,
+    <Quiz onNext={handleNext} />,
+    <Loading onNext={handleNext} />,
+    <Decisions onNext={handleNext} />,
+    <Gallery />
+  ];
+
   return (
     <div className="App">
-      {/* Left Corner Home Button */}
-      <button className="home-button" onClick={() => alert('Navigating to Home')}>
-        Home
-      </button>
+      {pages[currentPage]}
 
-      <div style={{ textAlign: 'center' }}>
-        <h1 style={{ fontSize: '48px' }}>
-          <span style={{ color: 'green' }}>MATCH</span>
-          <span style={{ color: 'black' }}>CELERATOR</span>
-        </h1>
-        <h6 style={{ fontSize: '24px', color: 'white' }}>Find Your Perfect Accelerator! </h6>
-        <button
-          style={{
-            padding: '15px 30px',
-            fontSize: '24px',
-            fontWeight: 'bold',
-            backgroundColor: '#FFFFF',
-            color: 'black',
-            border: 'none',
-            borderRadius: '10px',
-            cursor: 'pointer'
-          }}
-          onClick={() => alert('Starting Quiz...')}
-        >
-          Start Quiz
-        </button>
+      {/* Back and Next Buttons */}
+      <div className="navigation-buttons">
+        {currentPage > 0 && (
+          <button className="back-button" onClick={handleBack}>
+            Back
+          </button>
+        )}
 
-        {/* Circle Button with Image and Username */}
-        <div className="profile-section">
-          <div className="profile-circle">
-            <img
-              src="https://via.placeholder.com/150" // Placeholder image
-              alt="Profile"
-              className="profile-image"
-            />
-          </div>
-          <p className="profile-name">Josh</p>
-        </div>
+        {currentPage < pages.length - 1 && (
+          <button className="next-button" onClick={handleNext}>
+            Next
+          </button>
+        )}
       </div>
     </div>
   );

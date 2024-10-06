@@ -1,0 +1,27 @@
+/* src/pages/Homepage/Homepage.css */
+.homepage {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #f0f0f0;
+  }
+  
+  .homepage h1 {
+    font-size: 2rem;
+    color: #333;
+  }
+  
+  .homepage button {
+    padding: 10px 20px;
+    font-size: 1rem;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  
+  .homepage button:hover {
+    background-color: #45a049;
+  }
+  
